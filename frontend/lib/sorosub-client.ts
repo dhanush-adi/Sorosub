@@ -375,3 +375,77 @@ export async function buildRepayDebtTx(
 
     return preparedTx as StellarSdk.Transaction;
 }
+
+// Build a transaction for collecting a subscription payment (merchant triggers)
+export async function buildCollectPaymentTx(
+    callerPublicKey: string,
+    subscriberAddress: string,
+    merchantAddress: string
+): Promise<StellarSdk.Transaction> {
+    const server = getSorobanServer();
+    const contract = new Contract(CONTRACTS.SOROSUB);
+
+    const subscriber = new Address(subscriberAddress);
+    const merchant = new Address(merchantAddress);
+
+    const operation = contract.call(
+        'collect_payment',
+        subscriber.toScVal(),
+        merchant.toScVal()
+    );
+
+    const account = await server.getAccount(callerPublicKey);
+
+    const transaction = new TransactionBuilder(account, {
+        fee: '100000',
+        networkPassphrase: NETWORK.networkPassphrase,
+    })
+        .addOperation(operation)
+        .setTimeout(300)
+        .build();
+
+    const preparedTx = await server.prepareTransaction(transaction);
+
+    return preparedTx as StellarSdk.Transaction;
+}
+
+// Check if a payment can be processed
+export async function canProcessPayment(
+    subscriberAddress: string,
+    merchantAddress: string
+): Promise<boolean> {
+    try {
+        const server = getSorobanServer();
+        const contract = new Contract(CONTRACTS.SOROSUB);
+
+        const subscriber = new Address(subscriberAddress);
+        const merchant = new Address(merchantAddress);
+
+        const account = await server.getAccount(subscriberAddress);
+
+        const transaction = new TransactionBuilder(account, {
+            fee: '100',
+            networkPassphrase: NETWORK.networkPassphrase,
+        })
+            .addOperation(
+                contract.call(
+                    'can_process_payment',
+                    subscriber.toScVal(),
+                    merchant.toScVal()
+                )
+            )
+            .setTimeout(30)
+            .build();
+
+        const response = await server.simulateTransaction(transaction);
+
+        if ('result' in response && response.result) {
+            return response.result.retval.b() ?? false;
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error checking payment status:', error);
+        return false;
+    }
+}

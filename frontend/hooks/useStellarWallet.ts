@@ -6,6 +6,7 @@ import {
   getAddress,
   requestAccess,
   signTransaction,
+  signMessage,
   isAllowed,
   setAllowed,
 } from "@stellar/freighter-api";
@@ -53,7 +54,7 @@ export function useStellarWallet() {
     }
   }, []);
 
-  // Check connection status on mount
+  // Check connection status on mount - DO NOT auto-connect
   useEffect(() => {
     if (typeof window === "undefined") {
       setState({
@@ -65,66 +66,21 @@ export function useStellarWallet() {
       return;
     }
 
-    const checkConnection = async () => {
-      try {
-        const installed = await isFreighterInstalled();
-
-        if (!installed) {
-          setState({
-            isConnected: false,
-            isLoading: false,
-            publicKey: null,
-            error: null,
-          });
-          return;
-        }
-
-        // Check if we're allowed to access the wallet
-        const allowedResult = await isAllowed();
-        const allowed = allowedResult?.isAllowed ?? false;
-
-        if (allowed) {
-          // getAddress replaces getPublicKey in v6
-          const addressResult = await getAddress();
-          if (addressResult?.error) {
-            setState({
-              isConnected: false,
-              isLoading: false,
-              publicKey: null,
-              error: null,
-            });
-          } else {
-            const publicKey = addressResult?.address ?? null;
-            setState({
-              isConnected: !!publicKey,
-              isLoading: false,
-              publicKey,
-              error: null,
-            });
-          }
-        } else {
-          setState({
-            isConnected: false,
-            isLoading: false,
-            publicKey: null,
-            error: null,
-          });
-        }
-      } catch (error) {
-        console.error("Wallet check error:", error);
-        setState({
-          isConnected: false,
-          isLoading: false,
-          publicKey: null,
-          error: "Failed to check wallet connection",
-        });
-      }
+    // Just check if Freighter is installed, don't auto-connect
+    const checkInstalled = async () => {
+      await isFreighterInstalled();
+      setState({
+        isConnected: false,
+        isLoading: false,
+        publicKey: null,
+        error: null,
+      });
     };
 
-    checkConnection();
+    checkInstalled();
   }, [isFreighterInstalled]);
 
-  // Connect wallet
+  // Connect wallet - ALWAYS triggers popup by using signMessage
   const connect = useCallback(async () => {
     if (typeof window === "undefined") {
       setState((prev) => ({
@@ -150,7 +106,7 @@ export function useStellarWallet() {
         return false;
       }
 
-      // Request access - this will prompt user to connect
+      // First request access to ensure we have permission
       const accessResult = await requestAccess();
 
       if (accessResult?.error) {
@@ -167,6 +123,35 @@ export function useStellarWallet() {
 
       if (!publicKey) {
         throw new Error("Failed to get wallet address");
+      }
+
+      // Now trigger signMessage to FORCE the popup to appear
+      // This is a workaround to show the wallet UI
+      try {
+        const signResult = await signMessage("Connect to SoroSub", {
+          address: publicKey,
+          networkPassphrase: NETWORK.networkPassphrase,
+        });
+
+        // If user rejected, treat as cancellation
+        if (signResult?.error) {
+          setState({
+            isConnected: false,
+            isLoading: false,
+            publicKey: null,
+            error: null, // User cancelled, not an error
+          });
+          return false;
+        }
+      } catch {
+        // User rejected the signing, that's okay
+        setState({
+          isConnected: false,
+          isLoading: false,
+          publicKey: null,
+          error: null,
+        });
+        return false;
       }
 
       setState({
