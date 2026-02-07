@@ -9,6 +9,8 @@ import NewSubscriptionForm from '@/components/NewSubscriptionForm'
 import Marketplace from '@/components/Marketplace'
 import MyWallet from '@/components/MyWallet'
 import Settings from '@/components/Settings'
+import CreditScoreCard from '@/components/CreditScoreCard'
+import DebtCard from '@/components/DebtCard'
 
 export default function Dashboard() {
   const [activeNav, setActiveNav] = useState('Dashboard')
@@ -30,6 +32,12 @@ export default function Dashboard() {
                 </div>
 
                 <StatCards />
+
+                {/* Credit Score & BNPL Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <CreditScoreCard />
+                  <DebtCard />
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                   <div className="lg:col-span-2 animate-in slide-in-from-left duration-700">

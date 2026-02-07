@@ -8,17 +8,17 @@ export const NETWORK = {
     horizonUrl: 'https://horizon-testnet.stellar.org',
 };
 
-// Contract IDs (update after deployment)
+// Contract IDs (deployed to testnet)
 export const CONTRACTS = {
-    // TODO: Update this after deploying the contract
-    SOROSUB: 'PLACEHOLDER_CONTRACT_ID',
+    // SoroSub contract deployed on Stellar Testnet
+    SOROSUB: 'CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ',
     // Testnet USDC equivalent (for demo purposes)
     USDC: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
 };
 
 // Create a Soroban RPC server client
 export function getSorobanServer() {
-    return new StellarSdk.SorobanRpc.Server(NETWORK.rpcUrl);
+    return new StellarSdk.rpc.Server(NETWORK.rpcUrl);
 }
 
 // Create a Horizon server client

@@ -6,6 +6,14 @@
 [![Soroban](https://img.shields.io/badge/Soroban-Smart%20Contracts-purple)](https://soroban.stellar.org)
 [![SCF Build-A-Thon](https://img.shields.io/badge/SCF-Build--A--Thon-orange)](https://stellar.org/community-fund)
 
+## 🔗 Deployed Contract (Testnet)
+
+| Property | Value |
+|----------|-------|
+| **Contract ID** | `CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ` |
+| **Network** | Stellar Testnet |
+| **Explorer** | [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ) |
+
 ---
 
 ## 📖 Overview

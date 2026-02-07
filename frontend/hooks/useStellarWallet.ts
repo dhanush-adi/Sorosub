@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
+import freighter, {
     isConnected as freighterIsConnected,
-    getPublicKey,
+    getAddress,
     signTransaction,
     isAllowed,
     setAllowed,
+    requestAccess,
 } from '@stellar/freighter-api';
 import { NETWORK } from '@/lib/stellar';
 
@@ -28,8 +29,10 @@ export function useStellarWallet() {
     // Check if Freighter is installed
     const isFreighterInstalled = useCallback(async (): Promise<boolean> => {
         try {
-            const connected = await freighterIsConnected();
-            return connected.isConnected;
+            // Try both the named export and the default export
+            const result = await freighterIsConnected();
+            // v6 returns an object with isConnected property
+            return result?.isConnected ?? false;
         } catch {
             return false;
         }
@@ -51,12 +54,17 @@ export function useStellarWallet() {
                     return;
                 }
 
-                const allowed = await isAllowed();
+                // Check if we're allowed to access the wallet
+                const allowedResult = await isAllowed();
+                const allowed = allowedResult?.isAllowed ?? false;
 
-                if (allowed.isAllowed) {
-                    const { publicKey } = await getPublicKey();
+                if (allowed) {
+                    // getAddress replaces getPublicKey in v6
+                    const addressResult = await getAddress();
+                    const publicKey = addressResult?.address ?? null;
+
                     setState({
-                        isConnected: true,
+                        isConnected: !!publicKey,
                         isLoading: false,
                         publicKey,
                         error: null,
@@ -70,6 +78,7 @@ export function useStellarWallet() {
                     });
                 }
             } catch (error) {
+                console.error('Wallet check error:', error);
                 setState({
                     isConnected: false,
                     isLoading: false,
@@ -98,11 +107,20 @@ export function useStellarWallet() {
                 return false;
             }
 
-            // Request permission
-            await setAllowed();
+            // Request permission using requestAccess or setAllowed
+            try {
+                await requestAccess();
+            } catch {
+                await setAllowed();
+            }
 
-            // Get public key
-            const { publicKey } = await getPublicKey();
+            // Get public key using getAddress (v6 API)
+            const addressResult = await getAddress();
+            const publicKey = addressResult?.address ?? null;
+
+            if (!publicKey) {
+                throw new Error('Failed to get wallet address');
+            }
 
             setState({
                 isConnected: true,
@@ -142,10 +160,11 @@ export function useStellarWallet() {
             }
 
             try {
-                const { signedTxXdr } = await signTransaction(transactionXdr, {
+                const result = await signTransaction(transactionXdr, {
                     networkPassphrase: NETWORK.networkPassphrase,
                 });
-                return signedTxXdr;
+                // v6 returns an object with signedTxXdr property
+                return result?.signedTxXdr ?? null;
             } catch (error) {
                 setState((prev) => ({
                     ...prev,
