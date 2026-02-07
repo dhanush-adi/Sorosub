@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react'
 import { Copy, Send, Plus, TrendingUp, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, Wallet, Zap, Music, PieChart, Loader2 } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
+import { useWalletData } from '@/hooks/useWalletData'
 import { formatAddress } from '@/lib/stellar'
 import SubscriptionCard from '@/components/SubscriptionCard'
 import { buildCancelSubscriptionTx, submitTransaction } from '@/lib/sorosub-client'
+import { getStoredSubscriptions, removeSubscription, StoredSubscription } from '@/lib/subscription-storage'
 
 interface Asset {
   id: string
@@ -39,54 +41,72 @@ interface Subscription {
 
 export default function MyWallet() {
   const { isConnected, isLoading, publicKey, connect, sign } = useStellarWallet()
+  const { balance, subscriptions: walletSubscriptions, loading: walletLoading, refetch } = useWalletData()
   const [showBalance, setShowBalance] = useState(true)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [localSubscriptions, setLocalSubscriptions] = useState<StoredSubscription[]>([])
 
   // Ensure we're on client side before checking wallet
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Demo subscriptions - matching ActiveSubscriptions in Dashboard
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([
-    {
-      id: '1',
-      name: 'Premium News',
-      icon: <Zap className="w-5 h-5" />,
-      providerAddress: 'GDEMO1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-      cost: '10 USDC',
-      renewalDate: 'Feb 15, 2026',
-      status: 'active',
-    },
-    {
-      id: '2',
-      name: 'DeFi Bot Pro',
-      icon: <TrendingUp className="w-5 h-5" />,
-      providerAddress: 'GDEMO2BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
-      cost: '25 USDC',
-      renewalDate: 'Feb 8, 2026',
-      status: 'expiring',
-    },
-    {
-      id: '3',
-      name: 'Music Streaming',
-      icon: <Music className="w-5 h-5" />,
-      providerAddress: 'GDEMO3CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC',
-      cost: '7.50 USDC',
-      renewalDate: 'Feb 20, 2026',
-      status: 'active',
-    },
-    {
-      id: '4',
-      name: 'Analytics Dashboard',
-      icon: <PieChart className="w-5 h-5" />,
-      providerAddress: 'GDEMO4DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
-      cost: '15 USDC',
-      renewalDate: 'Feb 12, 2026',
-      status: 'pending',
-    },
-  ])
+  // Load subscriptions from localStorage and keep them updated
+  useEffect(() => {
+    const loadSubscriptions = () => {
+      const stored = getStoredSubscriptions()
+      setLocalSubscriptions(stored)
+    }
+
+    loadSubscriptions()
+
+    // Refresh every 30 seconds for real-time updates
+    const interval = setInterval(loadSubscriptions, 30000)
+    window.addEventListener('storage', loadSubscriptions)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', loadSubscriptions)
+    }
+  }, [])
+
+  // Refetch wallet data when connected
+  useEffect(() => {
+    if (isConnected && publicKey) {
+      refetch()
+    }
+  }, [isConnected, publicKey, refetch])
+
+  // Map service names to icons
+  const getServiceIcon = (name: string): React.ReactNode => {
+    const icons: Record<string, React.ReactNode> = {
+      'DeFi Analytics Pro': <PieChart className="w-5 h-5" />,
+      'AI Trading Bot': <TrendingUp className="w-5 h-5" />,
+      'Security Guardian': <Zap className="w-5 h-5" />,
+      'Stellar News Feed': <Music className="w-5 h-5" />,
+      'Performance Gauge': <Zap className="w-5 h-5" />,
+      'Database Access': <PieChart className="w-5 h-5" />,
+      'Smart Contract Dev': <Music className="w-5 h-5" />,
+      'Lightning Network': <Zap className="w-5 h-5" />,
+    }
+    return icons[name] || <Zap className="w-5 h-5" />
+  }
+
+  // Convert stored subscriptions to display format
+  const subscriptions = localSubscriptions.map((sub) => ({
+    id: sub.id,
+    name: sub.name,
+    icon: getServiceIcon(sub.name),
+    providerAddress: sub.providerAddress,
+    cost: `${sub.amount.toFixed(2)} XLM`,
+    renewalDate: new Date(sub.createdAt + sub.intervalSeconds * 1000).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    status: 'active' as const,
+  }))
 
   const assets: Asset[] = [
     {
@@ -173,25 +193,32 @@ export default function MyWallet() {
     setTimeout(() => setCopiedAddress(false), 2000)
   }
 
-  const handleCancelSubscription = async (sub: Subscription) => {
+  const handleCancelSubscription = async (subscription: typeof subscriptions[0]) => {
     if (!isConnected || !publicKey) return
 
     try {
-      const cancelTx = await buildCancelSubscriptionTx(publicKey, sub.providerAddress)
+      const cancelTx = await buildCancelSubscriptionTx(publicKey, subscription.providerAddress)
       const signedTx = await sign(cancelTx.toXDR())
 
       if (!signedTx) throw new Error('Failed to sign')
 
       await submitTransaction(signedTx)
-      setSubscriptions(subscriptions.filter((s) => s.id !== sub.id))
+      
+      // Remove from localStorage
+      removeSubscription(subscription.id)
+      
+      // Refetch wallet data
+      refetch()
+      
+      alert(`✅ Successfully cancelled ${subscription.name}`)
     } catch (error) {
       console.error('Cancel error:', error)
-      // Demo: still remove for demo
-      setSubscriptions(subscriptions.filter((s) => s.id !== sub.id))
+      alert(`❌ Failed to cancel ${subscription.name}. Please try again.`)
     }
   }
 
-  const totalBalance = '16,452.65'
+  // Calculate total balance across assets
+  const totalBalance = balance.toFixed(2)
 
   // Show loading state while mounting or checking wallet connection
   if (!mounted || isLoading) {
@@ -270,7 +297,7 @@ export default function MyWallet() {
                 <p className="text-muted-foreground text-xs md:text-sm uppercase tracking-wider font-semibold">Total Balance</p>
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-4xl md:text-5xl font-bold">
-                    {showBalance ? `$${totalBalance}` : '••••••'}
+                    {showBalance ? `${totalBalance} XLM` : '••••••'}
                   </span>
                   <button
                     onClick={() => setShowBalance(!showBalance)}
@@ -283,6 +310,12 @@ export default function MyWallet() {
                     )}
                   </button>
                 </div>
+                {walletLoading && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Updating...
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 md:gap-4">

@@ -2,11 +2,11 @@
 
 import React from "react"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Star, Download, TrendingUp, Zap, Music, Shield, Globe, Database, Code2, BarChart3, Cpu, Gauge, Loader2 } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
 import { CONTRACTS, INTERVALS, toStroops } from '@/lib/stellar'
-import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger } from '@/lib/sorosub-client'
+import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger, getSubscription } from '@/lib/sorosub-client'
 import { addSubscription } from '@/lib/subscription-storage'
 
 interface Service {
@@ -27,6 +27,7 @@ export default function Marketplace() {
   const { isConnected, publicKey, sign, connect } = useStellarWallet()
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [subscribingId, setSubscribingId] = useState<string | null>(null)
+  const [existingSubscriptions, setExistingSubscriptions] = useState<Set<string>>(new Set())
 
   // Each service has a unique provider (using valid generated addresses)
   // In production, these would be real merchant addresses
@@ -125,6 +126,34 @@ export default function Marketplace() {
     },
   ]
 
+  // Check for existing subscriptions when wallet connects
+  useEffect(() => {
+    const checkExistingSubscriptions = async () => {
+      if (!isConnected || !publicKey) {
+        setExistingSubscriptions(new Set())
+        return
+      }
+
+      const existing = new Set<string>()
+      
+      // Check each service to see if user is already subscribed
+      for (const service of services) {
+        try {
+          const sub = await getSubscription(publicKey, service.providerAddress)
+          if (sub && sub.isActive) {
+            existing.add(service.providerAddress)
+          }
+        } catch {
+          // Ignore errors, means no subscription
+        }
+      }
+
+      setExistingSubscriptions(existing)
+    }
+
+    checkExistingSubscriptions()
+  }, [isConnected, publicKey])
+
   const handleSubscribe = async (service: Service) => {
     if (!isConnected) {
       await connect()
@@ -133,11 +162,20 @@ export default function Marketplace() {
 
     if (!publicKey) return
 
+    // Check if subscription already exists
+    if (existingSubscriptions.has(service.providerAddress)) {
+      alert(`❌ You already have an active subscription to ${service.name}.\nCancel it first from Active Subscriptions if you want to re-subscribe.`)
+      return
+    }
+
     setSubscribingId(service.id)
 
     try {
       const amount = parseFloat(service.price)
       const intervalSeconds = INTERVALS.MONTHLY
+
+      // Inform user about the two-step process
+      console.log('📋 Subscription requires 2 signatures: (1) Token approval, (2) Create subscription')
 
       // Step 1: Approve token allowance
       const approvalAmount = amount * 12
@@ -152,10 +190,15 @@ export default function Marketplace() {
         expirationLedger
       )
 
+      console.log('📝 Step 1/2: Please approve token allowance in Freighter...')
       const signedApproveTx = await sign(approveTx.toXDR())
-      if (!signedApproveTx) throw new Error('Failed to sign approval')
+      if (!signedApproveTx) {
+        setSubscribingId(null)
+        return
+      }
 
       await submitTransaction(signedApproveTx)
+      console.log('✅ Token approval confirmed')
 
       // Step 2: Create subscription
       const createTx = await buildCreateSubscriptionTx(
@@ -166,10 +209,15 @@ export default function Marketplace() {
         intervalSeconds
       )
 
+      console.log('📝 Step 2/2: Please confirm subscription creation in Freighter...')
       const signedCreateTx = await sign(createTx.toXDR())
-      if (!signedCreateTx) throw new Error('Failed to sign subscription')
+      if (!signedCreateTx) {
+        setSubscribingId(null)
+        return
+      }
 
       await submitTransaction(signedCreateTx)
+      console.log('✅ Subscription created successfully')
 
       // Save subscription to local storage for dashboard
       addSubscription({
@@ -182,10 +230,34 @@ export default function Marketplace() {
         tokenAddress: CONTRACTS.USDC
       })
 
+      // Add to existing subscriptions set
+      setExistingSubscriptions(prev => new Set(prev).add(service.providerAddress))
+
       alert(`✅ Successfully subscribed to ${service.name}! Auto-payments are now active.`)
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      
+      // Silently handle user rejections (Freighter shows its own error)
+      if (errorMessage.toLowerCase().includes('rejected') || 
+          errorMessage.toLowerCase().includes('declined') || 
+          errorMessage.toLowerCase().includes('cancelled') ||
+          errorMessage.toLowerCase().includes('user') && errorMessage.toLowerCase().includes('denied')) {
+        console.log('Subscription cancelled by user')
+        return
+      }
+      
+      // Log other errors but don't show alert for common user actions
       console.error('Subscribe error:', error)
-      alert(`❌ Failed to subscribe to ${service.name}. Please try again.`)
+      
+      // Only show alerts for actual system errors
+      if (errorMessage.includes('insufficient')) {
+        alert(`❌ Insufficient balance to subscribe to ${service.name}. Please add more XLM to your wallet.`)
+      } else if (errorMessage.includes('UnreachableCodeReached')) {
+        alert(`❌ Subscription already exists. Please check Active Subscriptions.`)
+      } else if (!errorMessage.toLowerCase().includes('user')) {
+        // Only show error if it's not a user action
+        alert(`❌ Failed to subscribe to ${service.name}. Please try again.`)
+      }
     } finally {
       setSubscribingId(null)
     }
@@ -289,20 +361,31 @@ export default function Marketplace() {
 
                 <div className="flex items-center justify-between">
                   <span className="text-2xl font-bold text-accent">
-                    ${service.price}
+                    {service.price} XLM
                   </span>
                   <span className="text-xs text-muted-foreground">/month</span>
                 </div>
 
                 <button
                   onClick={() => handleSubscribe(service)}
-                  disabled={subscribingId === service.id}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/40 flex items-center justify-center gap-2 group-hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                  disabled={subscribingId === service.id || existingSubscriptions.has(service.providerAddress)}
+                  className={`w-full px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:scale-100 ${
+                    existingSubscriptions.has(service.providerAddress)
+                      ? 'bg-green-500/20 border-2 border-green-500/40 text-green-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground group-hover:shadow-lg group-hover:shadow-primary/40 group-hover:scale-105 disabled:opacity-50'
+                  }`}
                 >
                   {subscribingId === service.id ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Subscribing...
+                    </>
+                  ) : existingSubscriptions.has(service.providerAddress) ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Already Subscribed
                     </>
                   ) : !isConnected ? (
                     <>

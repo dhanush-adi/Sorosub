@@ -73,12 +73,19 @@ export default function ActiveSubscriptions() {
 
     // Listen for storage changes (in case subscription added in another tab)
     window.addEventListener('storage', loadSubscriptions)
-    return () => window.removeEventListener('storage', loadSubscriptions)
+    
+    // Refresh every 30 seconds for real-time updates
+    const interval = setInterval(loadSubscriptions, 30000)
+    
+    return () => {
+      window.removeEventListener('storage', loadSubscriptions)
+      clearInterval(interval)
+    }
   }, [])
 
-  // Reload when wallet connects (in case we need to filter by wallet)
+  // Reload when wallet connects or changes
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && publicKey) {
       const stored = getStoredSubscriptions()
       const displaySubs: DisplaySubscription[] = stored.map((sub) => ({
         id: sub.id,
@@ -91,7 +98,7 @@ export default function ActiveSubscriptions() {
       }))
       setSubscriptions(displaySubs)
     }
-  }, [isConnected])
+  }, [isConnected, publicKey])
 
   const handleCancel = async (sub: DisplaySubscription) => {
     if (!isConnected || !publicKey) {

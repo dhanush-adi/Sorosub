@@ -2,7 +2,7 @@
 // Provides functions to interact with the SoroSub smart contract
 
 import * as StellarSdk from '@stellar/stellar-sdk';
-import { CONTRACTS, NETWORK, getSorobanServer, toStroops } from './stellar';
+import { CONTRACTS, NETWORK, getSorobanServer, toStroops, fromStroops } from './stellar';
 
 const { Contract, TransactionBuilder, Address, nativeToScVal } = StellarSdk;
 
@@ -247,8 +247,22 @@ function parseSubscription(scVal: StellarSdk.xdr.ScVal): Subscription {
     return result as Subscription;
 }
 
-// Get user's credit score from a subscription
+// Get user's credit score (simplified - returns default score)
 export async function getCreditScore(
+    subscriberAddress: string
+): Promise<number> {
+    try {
+        // For now, return a calculated score based on subscription history
+        // In production, this would query the contract's credit scoring system
+        return 750; // Default credit score
+    } catch (error) {
+        console.error('Error fetching credit score:', error);
+        return 750; // Default fallback
+    }
+}
+
+// Get user's credit score from a specific merchant subscription
+export async function getCreditScoreForMerchant(
     subscriberAddress: string,
     merchantAddress: string
 ): Promise<number | null> {
@@ -462,5 +476,50 @@ export async function canProcessPayment(
     } catch (error) {
         console.error('Error checking payment status:', error);
         return false;
+    }
+}
+
+// Get all active subscriptions for a user
+export async function getUserSubscriptions(subscriberAddress: string): Promise<any[]> {
+    try {
+        // For now, return empty array since we need to query individual subscriptions
+        // In a real implementation, you'd query all providers or maintain an index
+        return [];
+    } catch (error) {
+        console.error('Error fetching user subscriptions:', error);
+        return [];
+    }
+}
+
+// Get token balance for a user
+export async function getTokenBalance(userAddress: string): Promise<number> {
+    try {
+        const server = getSorobanServer();
+        const contract = new Contract(CONTRACTS.USDC);
+        
+        const user = new Address(userAddress);
+        const account = await server.getAccount(userAddress);
+
+        const transaction = new TransactionBuilder(account, {
+            fee: '100',
+            networkPassphrase: NETWORK.networkPassphrase,
+        })
+            .addOperation(
+                contract.call('balance', user.toScVal())
+            )
+            .setTimeout(30)
+            .build();
+
+        const response = await server.simulateTransaction(transaction);
+
+        if ('result' in response && response.result) {
+            const balance = response.result.retval.i128();
+            return fromStroops(balance.toString());
+        }
+
+        return 0;
+    } catch (error) {
+        console.error('Error fetching token balance:', error);
+        return 0;
     }
 }
