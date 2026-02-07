@@ -138,6 +138,7 @@ export default function NewSubscriptionForm() {
             className="w-full px-4 py-2.5 md:py-3 bg-background/50 border border-border/60 rounded-lg text-sm smooth-transition focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 text-foreground placeholder-muted-foreground/50 hover:border-border/80 disabled:opacity-50"
             aria-label="Provider Address"
             required
+            suppressHydrationWarning
           />
           <p className="text-xs text-muted-foreground">Service provider&apos;s Stellar address</p>
         </div>
@@ -162,6 +163,7 @@ export default function NewSubscriptionForm() {
               className="w-full px-4 py-2.5 md:py-3 bg-background/50 border border-border/60 rounded-lg text-sm smooth-transition focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 text-foreground placeholder-muted-foreground/50 hover:border-border/80 disabled:opacity-50"
               aria-label="Amount in USDC"
               required
+              suppressHydrationWarning
             />
             {formData.amount && (
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-accent">
@@ -183,6 +185,7 @@ export default function NewSubscriptionForm() {
             onChange={handleChange}
             disabled={isProcessing}
             className="w-full px-4 py-2.5 md:py-3 bg-background/50 border border-border/60 rounded-lg text-sm smooth-transition focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 text-foreground hover:border-border/80 disabled:opacity-50"
+            suppressHydrationWarning
           >
             <option value="WEEKLY">Weekly</option>
             <option value="MONTHLY">Monthly</option>

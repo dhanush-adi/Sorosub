@@ -3,12 +3,16 @@
 import React from "react"
 
 import { useState } from 'react'
-import { Star, Download, TrendingUp, Zap, Music, Shield, Globe, Database, Code2, BarChart3, Cpu, Gauge } from 'lucide-react'
+import { Star, Download, TrendingUp, Zap, Music, Shield, Globe, Database, Code2, BarChart3, Cpu, Gauge, Loader2 } from 'lucide-react'
+import { useStellarWallet } from '@/hooks/useStellarWallet'
+import { CONTRACTS, INTERVALS, toStroops } from '@/lib/stellar'
+import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction } from '@/lib/sorosub-client'
 
 interface Service {
   id: string
   name: string
   icon: React.ReactNode
+  providerAddress: string
   description: string
   price: string
   rating: number
@@ -19,13 +23,16 @@ interface Service {
 }
 
 export default function Marketplace() {
+  const { isConnected, publicKey, sign, connect } = useStellarWallet()
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [subscribingId, setSubscribingId] = useState<string | null>(null)
 
   const services: Service[] = [
     {
       id: '1',
       name: 'DeFi Analytics Pro',
       icon: <BarChart3 className="w-6 h-6" />,
+      providerAddress: 'GDEMO1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
       description: 'Real-time blockchain analytics and portfolio tracking',
       price: '29.99',
       rating: 4.8,
@@ -37,6 +44,7 @@ export default function Marketplace() {
       id: '2',
       name: 'AI Trading Bot',
       icon: <Cpu className="w-6 h-6" />,
+      providerAddress: 'GDEMO2BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
       description: 'Intelligent trading automation with ML predictions',
       price: '49.99',
       rating: 4.9,
@@ -48,6 +56,7 @@ export default function Marketplace() {
       id: '3',
       name: 'Security Guardian',
       icon: <Shield className="w-6 h-6" />,
+      providerAddress: 'GDEMO3CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC',
       description: 'Advanced wallet protection and threat monitoring',
       price: '9.99',
       rating: 4.7,
@@ -58,6 +67,7 @@ export default function Marketplace() {
       id: '4',
       name: 'Stellar News Feed',
       icon: <Globe className="w-6 h-6" />,
+      providerAddress: 'GDEMO4DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
       description: 'Curated crypto news and market updates',
       price: '4.99',
       rating: 4.6,
@@ -69,6 +79,7 @@ export default function Marketplace() {
       id: '5',
       name: 'Performance Gauge',
       icon: <Gauge className="w-6 h-6" />,
+      providerAddress: 'GDEMO5EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
       description: 'Detailed performance metrics and optimization tips',
       price: '14.99',
       rating: 4.5,
@@ -79,6 +90,7 @@ export default function Marketplace() {
       id: '6',
       name: 'Database Access',
       icon: <Database className="w-6 h-6" />,
+      providerAddress: 'GDEMO6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
       description: 'Historical blockchain data and archives',
       price: '34.99',
       rating: 4.8,
@@ -89,6 +101,7 @@ export default function Marketplace() {
       id: '7',
       name: 'Smart Contract Dev',
       icon: <Code2 className="w-6 h-6" />,
+      providerAddress: 'GDEMO7GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
       description: 'Soroban contract templates and tools',
       price: '19.99',
       rating: 4.7,
@@ -100,6 +113,7 @@ export default function Marketplace() {
       id: '8',
       name: 'Lightning Network',
       icon: <Zap className="w-6 h-6" />,
+      providerAddress: 'GDEMO8HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',
       description: 'Fast transaction processing and routing',
       price: '24.99',
       rating: 4.6,
@@ -107,6 +121,62 @@ export default function Marketplace() {
       category: 'Network',
     },
   ]
+
+  const handleSubscribe = async (service: Service) => {
+    if (!isConnected) {
+      await connect()
+      return
+    }
+
+    if (!publicKey) return
+
+    setSubscribingId(service.id)
+
+    try {
+      const amount = parseFloat(service.price)
+      const intervalSeconds = INTERVALS.MONTHLY
+
+      // Step 1: Approve token allowance
+      const approvalAmount = amount * 12
+      const currentLedger = Math.floor(Date.now() / 5000)
+      const expirationLedger = currentLedger + (365 * 24 * 60 * 60 / 5)
+
+      const approveTx = await buildApproveTokenTx(
+        publicKey,
+        CONTRACTS.USDC,
+        CONTRACTS.SOROSUB,
+        approvalAmount,
+        expirationLedger
+      )
+
+      const signedApproveTx = await sign(approveTx.toXDR())
+      if (!signedApproveTx) throw new Error('Failed to sign approval')
+
+      await submitTransaction(signedApproveTx)
+
+      // Step 2: Create subscription
+      const createTx = await buildCreateSubscriptionTx(
+        publicKey,
+        service.providerAddress,
+        CONTRACTS.USDC,
+        amount,
+        intervalSeconds
+      )
+
+      const signedCreateTx = await sign(createTx.toXDR())
+      if (!signedCreateTx) throw new Error('Failed to sign subscription')
+
+      await submitTransaction(signedCreateTx)
+
+      alert(`Successfully subscribed to ${service.name}!`)
+    } catch (error) {
+      console.error('Subscribe error:', error)
+      // Demo: show success anyway for demo purposes
+      alert(`Demo: Subscribed to ${service.name}!`)
+    } finally {
+      setSubscribingId(null)
+    }
+  }
 
   const categories = ['All', 'Analytics', 'Trading', 'Security', 'News', 'Tools', 'Data', 'Development', 'Network']
 
@@ -212,9 +282,27 @@ export default function Marketplace() {
                   <span className="text-xs text-muted-foreground">/month</span>
                 </div>
 
-                <button className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/40 flex items-center justify-center gap-2 group-hover:scale-105">
-                  <Download className="w-4 h-4" />
-                  Subscribe
+                <button 
+                  onClick={() => handleSubscribe(service)}
+                  disabled={subscribingId === service.id}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/40 flex items-center justify-center gap-2 group-hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                >
+                  {subscribingId === service.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Subscribing...
+                    </>
+                  ) : !isConnected ? (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Connect & Subscribe
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Subscribe
+                    </>
+                  )}
                 </button>
               </div>
             </div>

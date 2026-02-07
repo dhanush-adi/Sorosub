@@ -1,15 +1,37 @@
 'use client'
 
 import { Wallet, Bell, ExternalLink } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PrimaryButton from '@/components/common/PrimaryButton'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
 import { formatAddress } from '@/lib/stellar'
 
-export default function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export default function Header({ onMenuClick }: HeaderProps = {}) {
   const { isConnected, isLoading, publicKey, error, connect, disconnect } = useStellarWallet()
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [showDisconnect, setShowDisconnect] = useState(false)
+  
+  const notificationRef = useRef<HTMLDivElement>(null)
+  const disconnectRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false)
+      }
+      if (disconnectRef.current && !disconnectRef.current.contains(event.target as Node)) {
+        setShowDisconnect(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleWalletClick = async () => {
     if (isConnected) {
@@ -24,6 +46,20 @@ export default function Header() {
       <div className="px-6 md:px-8 py-5 flex items-center justify-between">
         {/* Logo Section */}
         <div className="flex items-center gap-4">
+          {/* Hamburger Menu Button */}
+          <button
+            onClick={onMenuClick}
+            className="p-2.5 text-foreground/60 hover:text-foreground hover:bg-muted/30 rounded-lg smooth-transition group"
+            aria-label="Toggle Menu"
+            suppressHydrationWarning
+          >
+            <div className="flex flex-col gap-1.5 w-5 h-5 items-center justify-center">
+              <span className="w-5 h-0.5 bg-current rounded-full group-hover:scale-110 smooth-transition"></span>
+              <span className="w-5 h-0.5 bg-current rounded-full group-hover:scale-110 smooth-transition"></span>
+              <span className="w-5 h-0.5 bg-current rounded-full group-hover:scale-110 smooth-transition"></span>
+            </div>
+          </button>
+
           <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-primary via-purple-500 to-accent flex items-center justify-center shadow-lg shadow-primary/50 hover:scale-110 smooth-transition group">
             <span className="text-lg font-bold text-white group-hover:animate-float">◆</span>
           </div>
@@ -43,11 +79,12 @@ export default function Header() {
           )}
 
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationRef}>
             <button
               onClick={() => setIsNotificationOpen(!isNotificationOpen)}
               className="relative p-2.5 text-foreground/60 hover:text-foreground hover:bg-muted/30 rounded-lg smooth-transition group"
               aria-label="Notifications"
+              suppressHydrationWarning
             >
               <Bell className="w-5 h-5 group-hover:scale-110 smooth-transition" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full animate-pulse"></span>
@@ -74,7 +111,7 @@ export default function Header() {
           </div>
 
           {/* Wallet Button */}
-          <div className="relative">
+          <div className="relative" ref={disconnectRef}>
             <PrimaryButton
               variant={isConnected ? 'secondary' : 'primary'}
               size="md"

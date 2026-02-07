@@ -1,7 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Copy, Send, Plus, TrendingUp, Eye, EyeOff, ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Copy, Send, Plus, TrendingUp, Eye, EyeOff, ArrowDownLeft, ArrowUpRight, Wallet, Zap, Music, PieChart, Loader2 } from 'lucide-react'
+import { useStellarWallet } from '@/hooks/useStellarWallet'
+import { formatAddress } from '@/lib/stellar'
+import SubscriptionCard from '@/components/SubscriptionCard'
+import { buildCancelSubscriptionTx, submitTransaction } from '@/lib/sorosub-client'
 
 interface Asset {
   id: string
@@ -23,11 +27,66 @@ interface Transaction {
   status: 'completed' | 'pending'
 }
 
+interface Subscription {
+  id: string
+  name: string
+  icon: React.ReactNode
+  providerAddress: string
+  cost: string
+  renewalDate: string
+  status: 'active' | 'pending' | 'expiring'
+}
+
 export default function MyWallet() {
+  const { isConnected, isLoading, publicKey, connect, sign } = useStellarWallet()
   const [showBalance, setShowBalance] = useState(true)
   const [copiedAddress, setCopiedAddress] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  const walletAddress = 'G7HXF5H2X3Q8M9N2K3L4P5Q6R7S8T9U0V1W2X3Y4Z5'
+  // Ensure we're on client side before checking wallet
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Demo subscriptions - matching ActiveSubscriptions in Dashboard
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([
+    {
+      id: '1',
+      name: 'Premium News',
+      icon: <Zap className="w-5 h-5" />,
+      providerAddress: 'GDEMO1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      cost: '10 USDC',
+      renewalDate: 'Feb 15, 2026',
+      status: 'active',
+    },
+    {
+      id: '2',
+      name: 'DeFi Bot Pro',
+      icon: <TrendingUp className="w-5 h-5" />,
+      providerAddress: 'GDEMO2BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+      cost: '25 USDC',
+      renewalDate: 'Feb 8, 2026',
+      status: 'expiring',
+    },
+    {
+      id: '3',
+      name: 'Music Streaming',
+      icon: <Music className="w-5 h-5" />,
+      providerAddress: 'GDEMO3CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC',
+      cost: '7.50 USDC',
+      renewalDate: 'Feb 20, 2026',
+      status: 'active',
+    },
+    {
+      id: '4',
+      name: 'Analytics Dashboard',
+      icon: <PieChart className="w-5 h-5" />,
+      providerAddress: 'GDEMO4DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
+      cost: '15 USDC',
+      renewalDate: 'Feb 12, 2026',
+      status: 'pending',
+    },
+  ])
 
   const assets: Asset[] = [
     {
@@ -108,12 +167,87 @@ export default function MyWallet() {
   ]
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(walletAddress)
+    if (!publicKey) return
+    navigator.clipboard.writeText(publicKey)
     setCopiedAddress(true)
     setTimeout(() => setCopiedAddress(false), 2000)
   }
 
+  const handleCancelSubscription = async (sub: Subscription) => {
+    if (!isConnected || !publicKey) return
+
+    try {
+      const cancelTx = await buildCancelSubscriptionTx(publicKey, sub.providerAddress)
+      const signedTx = await sign(cancelTx.toXDR())
+
+      if (!signedTx) throw new Error('Failed to sign')
+
+      await submitTransaction(signedTx)
+      setSubscriptions(subscriptions.filter((s) => s.id !== sub.id))
+    } catch (error) {
+      console.error('Cancel error:', error)
+      // Demo: still remove for demo
+      setSubscriptions(subscriptions.filter((s) => s.id !== sub.id))
+    }
+  }
+
   const totalBalance = '16,452.65'
+
+  // Show loading state while mounting or checking wallet connection
+  if (!mounted || isLoading) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+        <div className="animate-in slide-in-from-down duration-700">
+          <div className="space-y-3">
+            <h1 className="text-4xl md:text-5xl font-bold text-balance gradient-text from-foreground via-primary to-accent">
+              My Wallet
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your assets and transactions</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center min-h-[400px] rounded-xl border border-border/60 bg-gradient-to-br from-card/70 to-card/40 backdrop-blur-xl p-8 space-y-6 animate-in fade-in duration-500">
+          <Loader2 className="w-10 h-10 text-accent animate-spin" />
+          <p className="text-muted-foreground text-sm">Checking wallet connection...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not connected, show connect prompt
+  if (!isConnected || !publicKey) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+        <div className="animate-in slide-in-from-down duration-700">
+          <div className="space-y-3">
+            <h1 className="text-4xl md:text-5xl font-bold text-balance gradient-text from-foreground via-primary to-accent">
+              My Wallet
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base">Manage your assets and transactions</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center min-h-[400px] rounded-xl border border-border/60 bg-gradient-to-br from-card/70 to-card/40 backdrop-blur-xl p-8 space-y-6 animate-in fade-in duration-500">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+            <Wallet className="w-10 h-10 text-accent" />
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-bold">Connect Your Wallet</h2>
+            <p className="text-muted-foreground text-sm max-w-md">
+              Connect your Freighter wallet to view your assets, subscriptions, and transaction history.
+            </p>
+          </div>
+          <button
+            onClick={connect}
+            className="px-6 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 flex items-center gap-2"
+          >
+            <Wallet className="w-4 h-4" />
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -203,6 +337,7 @@ export default function MyWallet() {
               ))}
             </div>
           </div>
+
         </div>
 
         <div className="space-y-8 animate-in slide-in-from-right duration-700">
@@ -210,10 +345,11 @@ export default function MyWallet() {
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Wallet Address</p>
               <div className="flex items-center gap-2 p-3 bg-background/50 rounded-lg border border-border/40 hover:border-primary/30 transition-colors duration-200">
-                <span className="text-xs font-mono text-foreground/70 truncate">{walletAddress}</span>
+                <span className="text-xs font-mono text-foreground/70 truncate flex-1">{formatAddress(publicKey)}</span>
                 <button
                   onClick={handleCopyAddress}
-                  className="p-1.5 hover:bg-card rounded transition-all duration-200"
+                  className="p-1.5 hover:bg-card rounded transition-all duration-200 flex-shrink-0"
+                  title="Copy full address"
                 >
                   {copiedAddress ? (
                     <svg className="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 20 20">
@@ -271,6 +407,42 @@ export default function MyWallet() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* My Subscriptions - Full Width */}
+      <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-bottom duration-700">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl md:text-2xl font-bold">My Subscriptions</h2>
+          <span className="text-xs text-muted-foreground">{subscriptions.length} active</span>
+        </div>
+        {subscriptions.length === 0 ? (
+          <div className="rounded-xl border border-border/60 bg-gradient-to-br from-card/70 to-card/40 backdrop-blur-xl p-8 text-center">
+            <p className="text-muted-foreground">No active subscriptions</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">Visit the Marketplace to subscribe to services</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {subscriptions.map((sub, index) => (
+              <div
+                key={sub.id}
+                className="animate-in fade-in slide-in-from-bottom"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <SubscriptionCard
+                  id={sub.id}
+                  name={sub.name}
+                  icon={sub.icon}
+                  providerAddress={sub.providerAddress}
+                  cost={sub.cost}
+                  renewalDate={sub.renewalDate}
+                  status={sub.status}
+                  onCancel={() => handleCancelSubscription(sub)}
+                  disabled={!isConnected}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

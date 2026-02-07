@@ -9,17 +9,23 @@ import NewSubscriptionForm from '@/components/NewSubscriptionForm'
 import Marketplace from '@/components/Marketplace'
 import MyWallet from '@/components/MyWallet'
 import Settings from '@/components/Settings'
-import CreditScoreCard from '@/components/CreditScoreCard'
+import CreditScoreGauge from '@/components/CreditScoreGauge'
 import DebtCard from '@/components/DebtCard'
 
 export default function Dashboard() {
   const [activeNav, setActiveNav] = useState('Dashboard')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} />
+      <Sidebar 
+        activeNav={activeNav} 
+        setActiveNav={setActiveNav}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="flex-1 overflow-auto">
           <div className="animate-in fade-in duration-500">
             {activeNav === 'Dashboard' && (
@@ -35,7 +41,7 @@ export default function Dashboard() {
 
                 {/* Credit Score & BNPL Section */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                  <CreditScoreCard />
+                  <CreditScoreGauge />
                   <DebtCard />
                 </div>
 

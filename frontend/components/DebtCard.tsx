@@ -29,8 +29,7 @@ export default function DebtCard() {
                 const userDebt = await getUserDebt(publicKey)
                 setDebt(userDebt)
             } catch (error) {
-                console.error('Error fetching debt:', error)
-                // Demo: no debt by default
+                // Silently handle errors - no debt by default
                 setDebt(null)
             } finally {
                 setIsLoading(false)

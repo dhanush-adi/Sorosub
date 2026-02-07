@@ -269,7 +269,11 @@ export async function getCreditScore(
 
         return null;
     } catch (error) {
-        console.error('Error fetching credit score:', error);
+        // Account not found is expected for new/unfunded wallets - don't log as error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('Account not found')) {
+            console.error('Error fetching credit score:', error);
+        }
         return null;
     }
 }
@@ -331,7 +335,11 @@ export async function getUserDebt(
 
         return null;
     } catch (error) {
-        console.error('Error fetching user debt:', error);
+        // Account not found is expected for new/unfunded wallets - don't log as error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('Account not found')) {
+            console.error('Error fetching user debt:', error);
+        }
         return null;
     }
 }

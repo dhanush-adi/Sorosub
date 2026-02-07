@@ -5,6 +5,8 @@ import { LayoutDashboard, Store, Wallet, Settings, Zap } from 'lucide-react'
 interface SidebarProps {
   activeNav: string
   setActiveNav: (nav: string) => void
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 const navItems = [
@@ -14,9 +16,28 @@ const navItems = [
   { label: 'Settings', icon: Settings },
 ]
 
-export default function Sidebar({ activeNav, setActiveNav }: SidebarProps) {
+export default function Sidebar({ activeNav, setActiveNav, isOpen = false, onClose }: SidebarProps) {
+  const handleNavClick = (label: string) => {
+    setActiveNav(label)
+    if (onClose) {
+      onClose()
+    }
+  }
+
   return (
-    <aside className="w-64 border-r border-border/60 bg-gradient-to-b from-card/70 to-card/40 backdrop-blur-xl flex flex-col">
+    <>
+      {/* Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={`w-64 border-r border-border/60 bg-gradient-to-b from-card/95 to-card/90 backdrop-blur-xl flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
       <div className="p-6 border-b border-border/40 bg-gradient-to-r from-primary/5 to-accent/5">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
@@ -32,7 +53,7 @@ export default function Sidebar({ activeNav, setActiveNav }: SidebarProps) {
           return (
             <button
               key={item.label}
-              onClick={() => setActiveNav(item.label)}
+              onClick={() => handleNavClick(item.label)}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl smooth-transition text-sm font-medium group relative overflow-hidden animate-in slide-in-from-left ${
                 isActive
                   ? 'bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/40'
@@ -72,5 +93,6 @@ export default function Sidebar({ activeNav, setActiveNav }: SidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   )
 }
