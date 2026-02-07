@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Plus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
 import { CONTRACTS, INTERVALS, IntervalType, toStroops } from '@/lib/stellar'
-import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction } from '@/lib/sorosub-client'
+import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger } from '@/lib/sorosub-client'
 
 type SubmitStatus = 'idle' | 'approving' | 'creating' | 'success' | 'error'
 
@@ -55,8 +55,8 @@ export default function NewSubscriptionForm() {
 
       // Approve 12x the amount (1 year of payments)
       const approvalAmount = amount * 12
-      const currentLedger = Math.floor(Date.now() / 5000) // Rough estimate
-      const expirationLedger = currentLedger + (365 * 24 * 60 * 60 / 5) // ~1 year
+      // Get current ledger from network for proper TTL
+      const expirationLedger = await getCurrentLedger()
 
       const approveTx = await buildApproveTokenTx(
         publicKey,
@@ -206,10 +206,10 @@ export default function NewSubscriptionForm() {
           type="submit"
           disabled={!isFormValid || isProcessing || status === 'success' || !isConnected}
           className={`w-full mt-6 px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-300 shadow-lg flex items-center justify-center gap-2 ${status === 'success'
-              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/50'
-              : isFormValid && isConnected
-                ? 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105'
-                : 'opacity-40 cursor-not-allowed bg-gradient-to-r from-primary to-accent text-primary-foreground'
+            ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/50'
+            : isFormValid && isConnected
+              ? 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105'
+              : 'opacity-40 cursor-not-allowed bg-gradient-to-r from-primary to-accent text-primary-foreground'
             }`}
         >
           {isProcessing ? (

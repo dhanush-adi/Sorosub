@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { Star, Download, TrendingUp, Zap, Music, Shield, Globe, Database, Code2, BarChart3, Cpu, Gauge, Loader2 } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
 import { CONTRACTS, INTERVALS, toStroops } from '@/lib/stellar'
-import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction } from '@/lib/sorosub-client'
+import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger } from '@/lib/sorosub-client'
+import { addSubscription } from '@/lib/subscription-storage'
 
 interface Service {
   id: string
@@ -27,14 +28,16 @@ export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [subscribingId, setSubscribingId] = useState<string | null>(null)
 
+  // Each service has a unique provider (using valid generated addresses)
+  // In production, these would be real merchant addresses
   const services: Service[] = [
     {
       id: '1',
       name: 'DeFi Analytics Pro',
       icon: <BarChart3 className="w-6 h-6" />,
-      providerAddress: 'GDEMO1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      providerAddress: 'GBXYP4ZWDRK2UPLKT55M7LXCJUJP26OORLIVIHTUL3DVXWMXQIIZMLNA', // Provider 1
       description: 'Real-time blockchain analytics and portfolio tracking',
-      price: '29.99',
+      price: '9.99',
       rating: 4.8,
       reviews: 342,
       category: 'Analytics',
@@ -44,9 +47,9 @@ export default function Marketplace() {
       id: '2',
       name: 'AI Trading Bot',
       icon: <Cpu className="w-6 h-6" />,
-      providerAddress: 'GDEMO2BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',
+      providerAddress: 'GCOWTNUOWC4SOJJYXZWRIV5JPP3FOZTW3UBSBX2TVS2M6F2P5NZHWTCV', // Provider 2
       description: 'Intelligent trading automation with ML predictions',
-      price: '49.99',
+      price: '4.99',
       rating: 4.9,
       reviews: 521,
       category: 'Trading',
@@ -56,9 +59,9 @@ export default function Marketplace() {
       id: '3',
       name: 'Security Guardian',
       icon: <Shield className="w-6 h-6" />,
-      providerAddress: 'GDEMO3CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC',
+      providerAddress: 'GDG3ROUV2QYWK2G2DOQXZZYA57KHXFPFPYYIYJMRKKKPXKRS7G34G3HH', // Provider 3
       description: 'Advanced wallet protection and threat monitoring',
-      price: '9.99',
+      price: '2.99',
       rating: 4.7,
       reviews: 189,
       category: 'Security',
@@ -67,9 +70,9 @@ export default function Marketplace() {
       id: '4',
       name: 'Stellar News Feed',
       icon: <Globe className="w-6 h-6" />,
-      providerAddress: 'GDEMO4DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',
+      providerAddress: 'GDLHPE23J43V6HTDDGABREZWHGVOOCN4Y4IHZ7XIY6LXPHTSPLCHAS4G', // Provider 4
       description: 'Curated crypto news and market updates',
-      price: '4.99',
+      price: '1.99',
       rating: 4.6,
       reviews: 423,
       category: 'News',
@@ -79,9 +82,9 @@ export default function Marketplace() {
       id: '5',
       name: 'Performance Gauge',
       icon: <Gauge className="w-6 h-6" />,
-      providerAddress: 'GDEMO5EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+      providerAddress: 'GAUWTGM2Y2RGDSWMJN3Y33ASYWAZ5TUUERIVHUNC6HBJXCXOELMCYPU3', // Provider 5
       description: 'Detailed performance metrics and optimization tips',
-      price: '14.99',
+      price: '3.99',
       rating: 4.5,
       reviews: 267,
       category: 'Tools',
@@ -90,9 +93,9 @@ export default function Marketplace() {
       id: '6',
       name: 'Database Access',
       icon: <Database className="w-6 h-6" />,
-      providerAddress: 'GDEMO6FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',
+      providerAddress: 'GDLGJZWN7SEIL3D6USU3UMUEH73XABIVMPE6K7WCXZGD7V667M6AFDCL', // Provider 6
       description: 'Historical blockchain data and archives',
-      price: '34.99',
+      price: '5.99',
       rating: 4.8,
       reviews: 198,
       category: 'Data',
@@ -101,9 +104,9 @@ export default function Marketplace() {
       id: '7',
       name: 'Smart Contract Dev',
       icon: <Code2 className="w-6 h-6" />,
-      providerAddress: 'GDEMO7GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
+      providerAddress: 'GBHZG44RPLZ2BE2HZNW5D76YHXJOZ5I5J7LUDZ25IV46MPFEAXWYW63D', // Provider 7
       description: 'Soroban contract templates and tools',
-      price: '19.99',
+      price: '7.99',
       rating: 4.7,
       reviews: 156,
       category: 'Development',
@@ -113,9 +116,9 @@ export default function Marketplace() {
       id: '8',
       name: 'Lightning Network',
       icon: <Zap className="w-6 h-6" />,
-      providerAddress: 'GDEMO8HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH',
+      providerAddress: 'GBMXDOP7B4OI4J6PFQDPGIIRP3NO7UE4FPJB4AO3MTAPAHMQSMAFCX7M', // Provider 8
       description: 'Fast transaction processing and routing',
-      price: '24.99',
+      price: '6.99',
       rating: 4.6,
       reviews: 312,
       category: 'Network',
@@ -138,8 +141,8 @@ export default function Marketplace() {
 
       // Step 1: Approve token allowance
       const approvalAmount = amount * 12
-      const currentLedger = Math.floor(Date.now() / 5000)
-      const expirationLedger = currentLedger + (365 * 24 * 60 * 60 / 5)
+      // Get current ledger from network for proper TTL
+      const expirationLedger = await getCurrentLedger()
 
       const approveTx = await buildApproveTokenTx(
         publicKey,
@@ -168,11 +171,21 @@ export default function Marketplace() {
 
       await submitTransaction(signedCreateTx)
 
-      alert(`Successfully subscribed to ${service.name}!`)
+      // Save subscription to local storage for dashboard
+      addSubscription({
+        id: `${service.id}-${Date.now()}`,
+        name: service.name,
+        providerAddress: service.providerAddress,
+        amount: amount,
+        intervalSeconds: intervalSeconds,
+        createdAt: Date.now(),
+        tokenAddress: CONTRACTS.USDC
+      })
+
+      alert(`✅ Successfully subscribed to ${service.name}! Auto-payments are now active.`)
     } catch (error) {
       console.error('Subscribe error:', error)
-      // Demo: show success anyway for demo purposes
-      alert(`Demo: Subscribed to ${service.name}!`)
+      alert(`❌ Failed to subscribe to ${service.name}. Please try again.`)
     } finally {
       setSubscribingId(null)
     }
@@ -201,11 +214,10 @@ export default function Marketplace() {
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 md:px-4 py-2 rounded-full font-medium text-sm smooth-transition animate-in slide-in-from-left ${
-              selectedCategory === cat
-                ? 'bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/40'
-                : 'bg-card/50 text-foreground/70 hover:text-foreground border border-border/50 hover:border-primary/30 hover:bg-card'
-            }`}
+            className={`px-3 md:px-4 py-2 rounded-full font-medium text-sm smooth-transition animate-in slide-in-from-left ${selectedCategory === cat
+              ? 'bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/40'
+              : 'bg-card/50 text-foreground/70 hover:text-foreground border border-border/50 hover:border-primary/30 hover:bg-card'
+              }`}
             style={{ animationDelay: `${index * 30}ms` }}
             aria-pressed={selectedCategory === cat}
           >
@@ -282,7 +294,7 @@ export default function Marketplace() {
                   <span className="text-xs text-muted-foreground">/month</span>
                 </div>
 
-                <button 
+                <button
                   onClick={() => handleSubscribe(service)}
                   disabled={subscribingId === service.id}
                   className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/40 flex items-center justify-center gap-2 group-hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"

@@ -15,6 +15,14 @@ export interface Subscription {
     isActive: boolean;
 }
 
+// Get the current ledger sequence from the network
+export async function getCurrentLedger(): Promise<number> {
+    const server = getSorobanServer();
+    const health = await server.getHealth();
+    // Use latest ledger from health check, add a buffer
+    return health.latestLedger + 100000; // Add ~6 days buffer for TTL
+}
+
 // Build a transaction for creating a subscription
 export async function buildCreateSubscriptionTx(
     subscriberPublicKey: string,
@@ -26,9 +34,16 @@ export async function buildCreateSubscriptionTx(
     const server = getSorobanServer();
     const contract = new Contract(CONTRACTS.SOROSUB);
 
-    const subscriber = new Address(subscriberPublicKey);
-    const provider = new Address(providerAddress);
-    const token = new Address(tokenAddress);
+    // Trim addresses to remove potential whitespace
+    const cleanSubscriber = subscriberPublicKey.trim();
+    const cleanProvider = providerAddress.trim();
+    const cleanToken = tokenAddress.trim();
+
+    console.log(`Creating subscription: Sub=${cleanSubscriber}, Prov=${cleanProvider}, Token=${cleanToken}`);
+
+    const subscriber = new Address(cleanSubscriber);
+    const provider = new Address(cleanProvider);
+    const token = new Address(cleanToken);
     const amountScVal = nativeToScVal(toStroops(amount), { type: 'i128' });
     const intervalScVal = nativeToScVal(BigInt(intervalSeconds), { type: 'u64' });
 

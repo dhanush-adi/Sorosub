@@ -2,8 +2,8 @@
 // Auto-generated after deployment to Stellar Testnet
 
 export const SOROSUB_CONFIG = {
-    // Contract ID on Stellar Testnet
-    CONTRACT_ID: "CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ",
+    // Contract ID on Stellar Testnet (newly deployed)
+    CONTRACT_ID: "CDDVY4S7WECSHRUVTNFIA4372SDTHKCBX6FJGGULZ6BBLTY6WTKGQOSO",
 
     // Network configuration
     NETWORK: "testnet",

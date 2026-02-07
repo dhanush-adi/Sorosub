@@ -10,10 +10,10 @@ export const NETWORK = {
 
 // Contract IDs (deployed to testnet)
 export const CONTRACTS = {
-    // SoroSub contract deployed on Stellar Testnet
-    SOROSUB: 'CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ',
-    // Testnet USDC equivalent (for demo purposes)
-    USDC: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+    // SoroSub contract deployed on Stellar Testnet (newly deployed)
+    SOROSUB: 'CDDVY4S7WECSHRUVTNFIA4372SDTHKCBX6FJGGULZ6BBLTY6WTKGQOSO',
+    // Native XLM as SAC token (user has ~10k XLM!)
+    USDC: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
 };
 
 // Create a Soroban RPC server client
