@@ -2,11 +2,11 @@
 
 import React from "react"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Star, Download, TrendingUp, Zap, Music, Shield, Globe, Database, Code2, BarChart3, Cpu, Gauge, Loader2 } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
 import { CONTRACTS, INTERVALS, toStroops } from '@/lib/stellar'
-import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger } from '@/lib/sorosub-client'
+import { buildCreateSubscriptionTx, buildApproveTokenTx, submitTransaction, getCurrentLedger, getSubscription } from '@/lib/sorosub-client'
 import { addSubscription } from '@/lib/subscription-storage'
 
 interface Service {
@@ -27,6 +27,33 @@ export default function Marketplace() {
   const { isConnected, publicKey, sign, connect } = useStellarWallet()
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [subscribingId, setSubscribingId] = useState<string | null>(null)
+  const [existingSubscriptions, setExistingSubscriptions] = useState<Set<string>>(new Set())
+
+  // Check for existing subscriptions when wallet connects
+  useEffect(() => {
+    const checkExistingSubscriptions = async () => {
+      if (!isConnected || !publicKey) {
+        setExistingSubscriptions(new Set())
+        return
+      }
+
+      const existing = new Set<string>()
+      
+      // Check each service to see if user is already subscribed
+      for (const service of services) {
+        try {
+          const sub = await getSubscription(publicKey, service.providerAddress)
+          if (sub && sub.isActive) {
+            existing.add(service.providerAddress)
+          }
+        } catch {} // Ignore errors, means no subscription
+      }
+
+      setExistingSubscriptions(existing)
+    }
+
+    checkExistingSubscriptions()
+  }, [isConnected, publicKey])
 
   // Each service has a unique provider (using valid generated addresses)
   // In production, these would be real merchant addresses
@@ -133,6 +160,12 @@ export default function Marketplace() {
 
     if (!publicKey) return
 
+    // Check if subscription already exists
+    if (existingSubscriptions.has(service.providerAddress)) {
+      alert(`❌ You already have an active subscription to ${service.name}.\nCancel it first from Active Subscriptions if you want to re-subscribe.`)
+      return
+    }
+
     setSubscribingId(service.id)
 
     try {
@@ -181,6 +214,9 @@ export default function Marketplace() {
         createdAt: Date.now(),
         tokenAddress: CONTRACTS.USDC
       })
+
+      // Add to existing subscriptions set
+      setExistingSubscriptions(prev => new Set(prev).add(service.providerAddress))
 
       alert(`✅ Successfully subscribed to ${service.name}! Auto-payments are now active.`)
     } catch (error) {
@@ -296,13 +332,24 @@ export default function Marketplace() {
 
                 <button
                   onClick={() => handleSubscribe(service)}
-                  disabled={subscribingId === service.id}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground rounded-lg font-semibold text-sm transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/40 flex items-center justify-center gap-2 group-hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                  disabled={subscribingId === service.id || existingSubscriptions.has(service.providerAddress)}
+                  className={`w-full px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:scale-100 ${
+                    existingSubscriptions.has(service.providerAddress)
+                      ? 'bg-green-500/20 border-2 border-green-500/40 text-green-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground group-hover:shadow-lg group-hover:shadow-primary/40 group-hover:scale-105 disabled:opacity-50'
+                  }`}
                 >
                   {subscribingId === service.id ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Subscribing...
+                    </>
+                  ) : existingSubscriptions.has(service.providerAddress) ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Already Subscribed
                     </>
                   ) : !isConnected ? (
                     <>
