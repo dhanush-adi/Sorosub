@@ -44,7 +44,7 @@ export async function buildCreateSubscriptionTx(
     const account = await server.getAccount(subscriberPublicKey);
 
     const transaction = new TransactionBuilder(account, {
-        fee: '100000', // 0.01 XLM
+        fee: '10000', // 0.001 XLM - low gas
         networkPassphrase: NETWORK.networkPassphrase,
     })
         .addOperation(operation)
@@ -77,7 +77,7 @@ export async function buildCancelSubscriptionTx(
     const account = await server.getAccount(subscriberPublicKey);
 
     const transaction = new TransactionBuilder(account, {
-        fee: '100000',
+        fee: '10000', // 0.001 XLM - low gas
         networkPassphrase: NETWORK.networkPassphrase,
     })
         .addOperation(operation)
@@ -116,7 +116,7 @@ export async function buildApproveTokenTx(
     const account = await server.getAccount(ownerPublicKey);
 
     const transaction = new TransactionBuilder(account, {
-        fee: '100000',
+        fee: '10000', // 0.001 XLM - low gas
         networkPassphrase: NETWORK.networkPassphrase,
     })
         .addOperation(operation)
@@ -364,7 +364,7 @@ export async function buildRepayDebtTx(
     const account = await server.getAccount(userPublicKey);
 
     const transaction = new TransactionBuilder(account, {
-        fee: '100000',
+        fee: '10000', // 0.001 XLM - low gas
         networkPassphrase: NETWORK.networkPassphrase,
     })
         .addOperation(operation)
@@ -397,7 +397,7 @@ export async function buildCollectPaymentTx(
     const account = await server.getAccount(callerPublicKey);
 
     const transaction = new TransactionBuilder(account, {
-        fee: '100000',
+        fee: '10000', // 0.001 XLM - low gas
         networkPassphrase: NETWORK.networkPassphrase,
     })
         .addOperation(operation)

@@ -31,24 +31,35 @@ export default function CreditScoreCard({ merchantAddress }: CreditScoreCardProp
 
     useEffect(() => {
         const fetchCreditScore = async () => {
-            if (!isConnected || !publicKey) return
+            if (!isConnected || !publicKey) {
+                setCreditScore(0)
+                return
+            }
 
             setIsLoading(true)
             try {
-                // If merchantAddress is provided, fetch specific subscription credit score
-                // Otherwise, we'd aggregate from all subscriptions (simplified for demo)
+                // HYBRID SCORING: Base from wallet + Contract score from payments
+                // This gives each wallet a unique starting point that grows with payments
+
+                // 1. Calculate wallet-specific base score (10-30 range)
+                const walletHash = publicKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+                const baseScore = (walletHash % 21) + 10 // 10-30 base
+
+                // 2. Try to get contract score (from actual payments)
+                let contractScore = 0
                 if (merchantAddress) {
                     const score = await getCreditScore(publicKey, merchantAddress)
-                    setCreditScore(score ?? 0)
-                } else {
-                    // Demo: show a simulated credit score based on wallet existence
-                    // In production, you'd fetch from all subscriptions
-                    setCreditScore(45) // Demo value
+                    contractScore = score ?? 0
                 }
+
+                // 3. Combined score: base + contract earnings
+                const totalScore = baseScore + contractScore
+                setCreditScore(totalScore)
             } catch (error) {
                 console.error('Error fetching credit score:', error)
-                // Demo fallback
-                setCreditScore(45)
+                // Fallback to wallet-based score only
+                const walletHash = publicKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+                setCreditScore((walletHash % 21) + 10)
             } finally {
                 setIsLoading(false)
             }

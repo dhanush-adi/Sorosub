@@ -7,8 +7,6 @@ import {
   requestAccess,
   signTransaction,
   signMessage,
-  isAllowed,
-  setAllowed,
 } from "@stellar/freighter-api";
 import { NETWORK } from "@/lib/stellar";
 
@@ -19,98 +17,80 @@ interface WalletState {
   error: string | null;
 }
 
+// Global state to share across all hook instances
+let globalState: WalletState = {
+  isConnected: false,
+  isLoading: false,
+  publicKey: null,
+  error: null,
+};
+let listeners: ((state: WalletState) => void)[] = [];
+
+function setGlobalState(newState: WalletState) {
+  globalState = newState;
+  listeners.forEach((listener) => listener(newState));
+}
+
 export function useStellarWallet() {
-  const [state, setState] = useState<WalletState>({
-    isConnected: false,
-    isLoading: true,
-    publicKey: null,
-    error: null,
-  });
+  const [state, setState] = useState<WalletState>(globalState);
+
+  // Subscribe to global state changes
+  useEffect(() => {
+    setState(globalState); // Sync on mount
+    const listener = (newState: WalletState) => setState(newState);
+    listeners.push(listener);
+    return () => {
+      listeners = listeners.filter((l) => l !== listener);
+    };
+  }, []);
 
   // Check if Freighter is installed
   const isFreighterInstalled = useCallback(async (): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    // Check for window.freighter object first (most reliable)
-    if (typeof (window as any).freighter !== "undefined") {
-      return true;
-    }
-
-    // Wait a bit for extension to inject, then retry
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    if (typeof (window as any).freighter !== "undefined") {
-      return true;
-    }
-
-    // Fallback to API check
-    try {
-      const result = await freighterIsConnected();
-      return result?.isConnected ?? false;
-    } catch {
-      return false;
-    }
+    if (typeof window === "undefined") return false;
+    return typeof (window as any).freighter !== "undefined";
   }, []);
 
-  // Check connection status on mount - DO NOT auto-connect
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      setState({
-        isConnected: false,
-        isLoading: false,
-        publicKey: null,
-        error: null,
-      });
-      return;
-    }
-
-    // Just check if Freighter is installed, don't auto-connect
-    const checkInstalled = async () => {
-      await isFreighterInstalled();
-      setState({
-        isConnected: false,
-        isLoading: false,
-        publicKey: null,
-        error: null,
-      });
-    };
-
-    checkInstalled();
-  }, [isFreighterInstalled]);
-
-  // Connect wallet - ALWAYS triggers popup by using signMessage
+  // Connect wallet - ALWAYS triggers popup via signMessage
   const connect = useCallback(async () => {
     if (typeof window === "undefined") {
-      setState((prev) => ({
-        ...prev,
+      setGlobalState({
+        ...globalState,
         isLoading: false,
         error: "Wallet connection is only available in browser",
-      }));
+      });
       return false;
     }
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    setGlobalState({ ...globalState, isLoading: true, error: null });
 
     try {
-      const installed = await isFreighterInstalled();
+      // Use official API to check if Freighter is available
+      let installed = false;
+      try {
+        const connResult = await freighterIsConnected();
+        // If we get any response, Freighter is installed
+        installed = connResult !== undefined;
+      } catch {
+        // If API throws, extension might not be injected yet
+        // Try direct window check as fallback
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        installed = typeof (window as any).freighter !== "undefined";
+      }
 
       if (!installed) {
-        setState((prev) => ({
-          ...prev,
+        setGlobalState({
+          isConnected: false,
           isLoading: false,
-          error:
-            "Freighter wallet not installed. Please install it from freighter.app",
-        }));
+          publicKey: null,
+          error: "Freighter wallet not installed. Please install it from freighter.app",
+        });
         return false;
       }
 
-      // First request access to ensure we have permission
+      // Request access first
       const accessResult = await requestAccess();
-
       if (accessResult?.error) {
-        setState({
+        setGlobalState({
           isConnected: false,
           isLoading: false,
           publicKey: null,
@@ -120,32 +100,30 @@ export function useStellarWallet() {
       }
 
       const publicKey = accessResult?.address ?? null;
-
       if (!publicKey) {
         throw new Error("Failed to get wallet address");
       }
 
-      // Now trigger signMessage to FORCE the popup to appear
-      // This is a workaround to show the wallet UI
+      // FORCE POPUP: Sign a message to prove wallet ownership
       try {
         const signResult = await signMessage("Connect to SoroSub", {
           address: publicKey,
           networkPassphrase: NETWORK.networkPassphrase,
         });
 
-        // If user rejected, treat as cancellation
         if (signResult?.error) {
-          setState({
+          // User rejected - stay disconnected
+          setGlobalState({
             isConnected: false,
             isLoading: false,
             publicKey: null,
-            error: null, // User cancelled, not an error
+            error: null,
           });
           return false;
         }
       } catch {
-        // User rejected the signing, that's okay
-        setState({
+        // User rejected signing
+        setGlobalState({
           isConnected: false,
           isLoading: false,
           publicKey: null,
@@ -154,7 +132,8 @@ export function useStellarWallet() {
         return false;
       }
 
-      setState({
+      // Successfully connected and signed
+      setGlobalState({
         isConnected: true,
         isLoading: false,
         publicKey,
@@ -163,20 +142,19 @@ export function useStellarWallet() {
 
       return true;
     } catch (error) {
-      setState({
+      setGlobalState({
         isConnected: false,
         isLoading: false,
         publicKey: null,
-        error:
-          error instanceof Error ? error.message : "Failed to connect wallet",
+        error: error instanceof Error ? error.message : "Failed to connect wallet",
       });
       return false;
     }
-  }, [isFreighterInstalled]);
+  }, []);
 
-  // Disconnect wallet (just clear local state, Freighter handles actual connection)
+  // Disconnect wallet - clears all state
   const disconnect = useCallback(() => {
-    setState({
+    setGlobalState({
       isConnected: false,
       isLoading: false,
       publicKey: null,
@@ -187,43 +165,40 @@ export function useStellarWallet() {
   // Sign a transaction
   const sign = useCallback(
     async (transactionXdr: string): Promise<string | null> => {
-      if (!state.isConnected || !state.publicKey) {
-        setState((prev) => ({ ...prev, error: "Wallet not connected" }));
+      if (!globalState.isConnected || !globalState.publicKey) {
+        setGlobalState({ ...globalState, error: "Wallet not connected" });
         return null;
       }
 
       try {
         const result = await signTransaction(transactionXdr, {
-          address: state.publicKey,
+          address: globalState.publicKey,
           networkPassphrase: NETWORK.networkPassphrase,
         });
 
         if (result?.error) {
-          setState((prev) => ({
-            ...prev,
+          setGlobalState({
+            ...globalState,
             error: result.error?.message || "Failed to sign transaction",
-          }));
+          });
           return null;
         }
 
         return result?.signedTxXdr ?? null;
       } catch (error) {
-        setState((prev) => ({
-          ...prev,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to sign transaction",
-        }));
+        setGlobalState({
+          ...globalState,
+          error: error instanceof Error ? error.message : "Failed to sign transaction",
+        });
         return null;
       }
     },
-    [state.isConnected, state.publicKey],
+    [],
   );
 
   // Clear error
   const clearError = useCallback(() => {
-    setState((prev) => ({ ...prev, error: null }));
+    setGlobalState({ ...globalState, error: null });
   }, []);
 
   return {
