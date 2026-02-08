@@ -6,56 +6,124 @@
 [![Soroban](https://img.shields.io/badge/Soroban-Smart%20Contracts-purple)](https://soroban.stellar.org)
 [![SCF Build-A-Thon](https://img.shields.io/badge/SCF-Build--A--Thon-orange)](https://stellar.org/community-fund)
 
+---
+
 ## 🔗 Deployed Contract (Testnet)
 
 | Property | Value |
 |----------|-------|
-| **Contract ID** | `CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ` |
+| **Contract ID** | `CDDVY4S7WECSHRUVTNFIA4372SDTHKCBX6FJGGULZ6BBLTY6WTKGQOSO` |
 | **Network** | Stellar Testnet |
-| **Explorer** | [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC72ORKR3TVSIZ7TOFMNTKPJJ77IL6NMQAWBWQBIBRNIHEJARBWZRBQJ) |
+| **Explorer** | [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CDDVY4S7WECSHRUVTNFIA4372SDTHKCBX6FJGGULZ6BBLTY6WTKGQOSO) |
 
 ---
 
-## 📖 Overview
+## ❓ Problem Statement
 
-SoroSub enables **subscription-based payments on Stellar** where users approve once and the smart contract automatically pulls funds on a recurring basis. Combined with **Cred-Fi**, our on-chain credit scoring system, users can build credit history and access Buy Now, Pay Later (BNPL) micro-loans.
+### The Challenge
 
-### Key Features
+Traditional subscription services face critical limitations:
+
+1. **Centralized Control**: Users must trust third-party payment processors with their financial data
+2. **No Credit Building**: Subscription payment history doesn't contribute to financial reputation
+3. **Payment Failures**: When card balances are low, subscriptions fail causing service interruptions
+4. **High Fees**: Traditional systems charge 2-3% per transaction
+5. **No Interoperability**: Payment histories are siloed within individual platforms
+
+### Our Solution
+
+**SoroSub** solves these problems by leveraging Stellar's Soroban smart contracts:
+
+| Problem | SoroSub Solution |
+|---------|------------------|
+| Centralized control | **Non-custodial**: Users approve once, maintain full control |
+| No credit building | **Cred-Fi**: On-chain credit scoring (+10 per successful payment) |
+| Payment failures | **BNPL**: Automatic micro-loans from liquidity pool (credit score >50) |
+| High fees | **Sub-cent fees**: Stellar's low transaction costs |
+| No interoperability | **On-chain history**: Portable credit scores across dApps |
+
+---
+
+## ✨ Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔄 **Recurring Payments** | Approve once, auto-debit monthly using `transfer_from` |
-| 📊 **Credit Scoring** | Build on-chain credit (+10 points per successful payment) |
+| 🔄 **Set-and-Forget Payments** | Approve once, auto-debit monthly using `transfer_from` |
+| 📊 **On-Chain Credit Scoring** | Build credit history (+10 points per successful payment) |
 | 💳 **BNPL Micro-Loans** | Access credit when balance is low (requires credit score >50) |
 | 🔐 **Non-Custodial** | Users maintain full control of their funds |
-| ⚡ **Low Fees** | Leverage Stellar's sub-cent transaction costs |
+| ⚡ **Ultra-Low Fees** | 0.001 XLM per transaction |
+| 🏪 **Service Marketplace** | Browse and subscribe to services in one click |
+| 📈 **Dashboard Analytics** | Track subscriptions, spending, and credit score |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture Overview
 
+```mermaid
+flowchart TB
+    subgraph Frontend["🖥️ Frontend (Next.js)"]
+        UI[User Interface]
+        Wallet[Freighter Wallet Hook]
+        Storage[Local Storage]
+    end
+
+    subgraph Stellar["⭐ Stellar Network (Soroban)"]
+        Contract[SoroSub Contract]
+        Token[XLM/USDC Token]
+        Pool[Liquidity Pool]
+    end
+
+    subgraph Functions["📦 Contract Functions"]
+        Create[create_subscription]
+        Collect[collect_payment]
+        Cancel[cancel_subscription]
+        Credit[get_credit_score]
+        BNPL[BNPL Logic]
+    end
+
+    UI --> |"1. Connect"| Wallet
+    Wallet --> |"2. Sign Approval"| Token
+    Wallet --> |"3. Create Sub"| Contract
+    Contract --> Create
+    Contract --> Collect
+    Contract --> Cancel
+    Contract --> Credit
+    
+    Collect --> |"Balance OK"| Token
+    Collect --> |"Low Balance + Credit>50"| BNPL
+    BNPL --> Pool
+    
+    Contract --> |"Store Locally"| Storage
+    Storage --> |"Display"| UI
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
-│  │   Dashboard  │  │  Subscribe   │  │   Credit/BNPL        │   │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘   │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ Freighter Wallet
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Stellar Network (Soroban)                     │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                   SoroSub Contract                        │   │
-│  │  • create_subscription()    • collect_payment()           │   │
-│  │  • cancel_subscription()    • get_credit_score()          │   │
-│  │  • get_user_debt()          • repay_debt()                │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────┐  ┌─────────────────────────────────┐   │
-│  │   Token Contract     │  │      Liquidity Pool             │   │
-│  │   (USDC/XLM)         │  │      (BNPL Funding)             │   │
-│  └──────────────────────┘  └─────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+
+### Payment Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Freighter
+    participant SoroSub as SoroSub Contract
+    participant Token as XLM Token
+
+    User->>Frontend: Click "Subscribe"
+    Frontend->>Freighter: Request Approval Signature
+    Freighter-->>User: Sign Approval?
+    User->>Freighter: Approve
+    Freighter->>Token: approve(contract, amount, ttl)
+    
+    Frontend->>Freighter: Request Subscription Signature
+    Freighter-->>User: Sign Subscription?
+    User->>Freighter: Approve
+    Freighter->>SoroSub: create_subscription()
+    SoroSub-->>Frontend: Success!
+    
+    Note over SoroSub: Later (automated)...
+    
+    SoroSub->>Token: transfer_from(user, merchant, amount)
+    SoroSub->>SoroSub: credit_score += 10
 ```
 
 ---
@@ -69,53 +137,39 @@ sorosub/
 │   └── contracts/
 │       └── sorosub/
 │           └── src/
-│               ├── lib.rs      # Main contract logic
-│               └── test.rs     # Comprehensive tests
+│               ├── lib.rs      # Main contract logic (553 lines)
+│               └── test.rs     # Comprehensive tests (13 passing)
 │
 └── frontend/                   # Next.js Web Application
     ├── app/                    # App router pages
+    │   └── dashboard/          # User dashboard
     ├── components/             # React components
-    ├── hooks/                  # Custom hooks
-    └── lib/                    # Utilities & contract bindings
+    │   ├── Marketplace.tsx     # Service marketplace
+    │   ├── ActiveSubscriptions.tsx
+    │   ├── CreditScoreCard.tsx
+    │   └── ...
+    ├── hooks/
+    │   └── useStellarWallet.ts # Freighter integration
+    └── lib/
+        ├── stellar.ts          # Network config
+        ├── sorosub-client.ts   # Contract interactions
+        └── subscription-storage.ts
 ```
 
 ---
 
 ## 🔧 Smart Contract API
 
-### Data Structures
+### Core Functions
 
-```rust
-struct Subscription {
-    subscriber: Address,      // User paying
-    merchant: Address,        // Recipient
-    token: Address,           // Payment token (USDC/XLM)
-    amount: i128,             // Amount per period
-    interval: u64,            // Seconds between payments
-    last_payment_time: u64,   // Last successful payment
-    is_active: bool,          // Active status
-    credit_score: u32,        // 0-∞, +10 per payment
-}
-
-struct UserDebt {
-    amount: i128,             // Outstanding BNPL debt
-    token: Address,           // Token owed
-}
-```
-
-### Functions
-
-| Function | Description | Auth Required |
-|----------|-------------|---------------|
+| Function | Description | Auth |
+|----------|-------------|------|
 | `initialize(admin, liquidity_pool)` | One-time setup | Admin |
-| `create_subscription(subscriber, merchant, token, amount, interval)` | Create new subscription | Subscriber |
+| `create_subscription(subscriber, merchant, token, amount, interval)` | Create subscription | Subscriber |
 | `collect_payment(subscriber, merchant)` | Process payment (with BNPL fallback) | Anyone |
 | `cancel_subscription(subscriber, merchant)` | Cancel subscription | Subscriber |
-| `get_subscription(subscriber, merchant)` | Query subscription details | None |
-| `get_credit_score(subscriber, merchant)` | Get user's credit score | None |
-| `get_user_debt(user)` | Query BNPL debt | None |
+| `get_credit_score(subscriber, merchant)` | Get on-chain credit score | None |
 | `repay_debt(user, amount)` | Repay BNPL loan | User |
-| `can_process_payment(subscriber, merchant)` | Check if payment is due | None |
 
 ### BNPL Logic
 
@@ -126,7 +180,7 @@ IF user_balance >= payment_amount:
 ELSE IF credit_score > 50:
     → BNPL: Pay from liquidity pool
     → Record debt against user
-    → Emit "BNPL Triggered" event
+    → Emit "bnpl" event
     
 ELSE:
     → Payment fails (insufficient balance + low credit)
@@ -139,53 +193,79 @@ ELSE:
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (1.70+)
-- [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup)
+- [Stellar CLI](https://developers.stellar.org/docs/tools/developer-tools/cli/install-cli)
 - [Node.js](https://nodejs.org/) (18+)
-- [pnpm](https://pnpm.io/)
+- [Freighter Wallet](https://freighter.app/)
 
-### Backend Setup
+### Run Locally
 
 ```bash
-# Navigate to backend
+# Clone the repository
+git clone https://github.com/dhanush-adi/Sorosub.git
+cd Sorosub
+
+# Backend: Build and test contract
 cd backend
-
-# Build the contract
-cargo build --release
-
-# Run tests
+stellar contract build
 cargo test --package sorosub
 
-# Build WASM for deployment
-soroban contract build
+# Frontend: Install and run
+cd ../frontend
+npm install
+npm run dev
 ```
 
-### Frontend Setup
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-```bash
-# Navigate to frontend
-cd frontend
+---
 
-# Install dependencies
-pnpm install
+## 📸 Screenshots
 
-# Run development server
-pnpm dev
-```
+> *Screenshots will be added here*
 
-### Deploy to Testnet
+<!-- 
+![Dashboard](screenshots/dashboard.png)
+![Marketplace](screenshots/marketplace.png)
+![Credit Score](screenshots/credit-score.png)
+-->
 
-```bash
-# Configure Stellar testnet
-soroban network add testnet \
-  --rpc-url https://soroban-testnet.stellar.org \
-  --network-passphrase "Test SDF Network ; September 2015"
+---
 
-# Deploy contract
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/sorosub.wasm \
-  --network testnet \
-  --source <YOUR_SECRET_KEY>
-```
+## 🔐 Security Model
+
+### Auth Abstraction Pattern
+
+SoroSub uses Stellar's token allowance system for secure recurring payments:
+
+1. **User approves once**: `token.approve(sorosub_contract, amount, expiration)`
+2. **Contract pulls on schedule**: `token.transfer_from(user, merchant, amount)`
+3. **Expiration protection**: Approvals use ledger-based TTL (~6 days)
+
+### Security Checks
+
+- ✅ **Interval enforcement**: Payments only process after interval passes
+- ✅ **Balance verification**: Checks user balance before transfer
+- ✅ **Credit gating**: BNPL requires credit score >50
+- ✅ **Auth requirements**: Critical functions require signatures
+
+---
+
+## 🗺️ Future Scope
+
+### Short-Term (v1.1)
+- [ ] Multi-token support (USDC, EURC, other Stellar assets)
+- [ ] Email/webhook notifications for payments
+- [ ] Subscription analytics dashboard for merchants
+
+### Medium-Term (v2.0)
+- [ ] Cross-chain subscriptions via bridges
+- [ ] Credit score NFTs (portable reputation)
+- [ ] Merchant SDK for easy integration
+
+### Long-Term Vision
+- [ ] Decentralized credit bureaus
+- [ ] P2P lending based on credit scores
+- [ ] Mainnet launch with real merchants
 
 ---
 
@@ -214,58 +294,15 @@ test result: ok. 13 passed; 0 failed
 
 ---
 
-## 🔐 Security Model
-
-### Auth Abstraction Pattern
-
-SoroSub uses Stellar's token allowance system for secure recurring payments:
-
-1. **User approves once**: `token.approve(sorosub_contract, amount, expiration)`
-2. **Contract pulls on schedule**: `token.transfer_from(user, merchant, amount)`
-3. **Expiration protection**: Approvals have ledger-based expiration
-
-### Security Checks
-
-- ✅ **Interval enforcement**: Payments can only be processed after interval passes
-- ✅ **Balance verification**: Checks user balance before attempting transfer
-- ✅ **Credit gating**: BNPL only available with credit score >50
-- ✅ **Auth requirements**: Critical functions require signatures
-
----
-
-## 🗺️ Roadmap
-
-- [x] Core subscription contract
-- [x] Credit scoring system
-- [x] BNPL micro-loans
-- [x] Comprehensive test suite
-- [ ] Testnet deployment
-- [ ] Frontend integration
-- [ ] Mainnet launch
-- [ ] Multi-token support
-- [ ] Subscription marketplace
-
----
-
 ## 👥 Team
 
-| Role | Responsibility |
-|------|----------------|
-| **Blockchain Dev** | Smart contracts, backend, integration |
-| **Frontend Dev** | React components, pages, state management |
-| **UI/UX Designer** | Design system, user experience |
+Built for the **Stellar Community Fund Build-A-Thon**
 
 ---
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Please read our contributing guidelines before submitting PRs.
 
 ---
 
