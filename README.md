@@ -377,13 +377,25 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📸 Screenshots
 
-> *Screenshots will be added here*
+### Wallet Connection
+![Wallet Connect](screenshots/wallet-connect.png)
+*Freighter wallet integration with message signing for secure authentication*
 
-<!-- 
+### Dashboard
 ![Dashboard](screenshots/dashboard.png)
+*Real-time dashboard showing active subscriptions, monthly spend, credit score, and BNPL status*
+
+### Active Subscriptions
+![Subscriptions](screenshots/subscriptions.png)
+*Manage your active subscriptions with cancel options and renewal dates*
+
+### Service Marketplace
 ![Marketplace](screenshots/marketplace.png)
-![Credit Score](screenshots/credit-score.png)
--->
+*Browse and subscribe to services with one-click subscription*
+
+### On-Chain Contract Activity
+![Contract Activity](screenshots/contract-activity.png)
+*Stellar Expert showing real `create_subscription` and `cancel_subscription` transactions on testnet*
 
 ---
 
