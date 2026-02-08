@@ -504,7 +504,7 @@ test result: ok. 13 passed; 0 failed
 
 ## 👥 Team
 
-Built for the **Stellar Community Fund Build-A-Thon**
+Built for the **Stellar Build-A-Thon Chennai, By team Taskforce**
 
 ---
 
@@ -515,5 +515,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  Built with ❤️ for the <strong>Stellar Community Fund Build-A-Thon</strong>
+  Built with ❤️ for the <strong>Stellar Community Build-A-Thon</strong>
 </p>
