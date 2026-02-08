@@ -1,37 +1,110 @@
 'use client'
 
 import { TrendingUp, DollarSign, Clock, ArrowUpRight } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useStellarWallet } from '@/hooks/useStellarWallet'
+import { getStoredSubscriptions } from '@/lib/subscription-storage'
 
 export default function StatCards() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const { isConnected, publicKey } = useStellarWallet()
+  const [subscriptions, setSubscriptions] = useState<ReturnType<typeof getStoredSubscriptions>>([])
 
-  const stats = [
-    {
-      title: 'Total Active Subs',
-      value: '7',
-      icon: TrendingUp,
-      color: 'from-primary',
-      subtext: '+2 this month',
-      trend: '+28.6%',
-    },
-    {
-      title: 'Monthly Spend (USDC)',
-      value: '187.50',
-      icon: DollarSign,
-      color: 'from-accent',
-      subtext: 'Next billing cycle',
-      trend: '+12.5%',
-    },
-    {
-      title: 'Next Payment Due',
-      value: '5 days',
-      icon: Clock,
-      color: 'from-secondary',
-      subtext: 'Feb 10, 2026 @ 14:00 UTC',
-      trend: 'On Track',
-    },
-  ]
+  // Load subscriptions from storage
+  useEffect(() => {
+    if (isConnected && publicKey) {
+      const subs = getStoredSubscriptions()
+      setSubscriptions(subs)
+    } else {
+      setSubscriptions([])
+    }
+  }, [isConnected, publicKey])
+
+  // Refresh every 30 seconds
+  useEffect(() => {
+    if (!isConnected || !publicKey) return
+
+    const interval = setInterval(() => {
+      const subs = getStoredSubscriptions()
+      setSubscriptions(subs)
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [isConnected, publicKey])
+
+  // Helper to calculate next renewal date
+  const getNextRenewal = (createdAt: number, intervalSeconds: number): Date => {
+    const now = Date.now()
+    const intervalMs = intervalSeconds * 1000
+    const elapsed = now - createdAt
+    const periodsElapsed = Math.floor(elapsed / intervalMs)
+    const nextRenewal = createdAt + (periodsElapsed + 1) * intervalMs
+    return new Date(nextRenewal)
+  }
+
+  // Calculate real stats
+  const stats = useMemo(() => {
+    const totalSubs = subscriptions.length
+
+    // Calculate monthly spend (sum of all subscription amounts - already in XLM)
+    const monthlySpend = subscriptions.reduce((total, sub) => {
+      return total + sub.amount
+    }, 0)
+
+    // Find next payment date (earliest upcoming renewal)
+    let nextPaymentDays = '--'
+    let nextPaymentDate = 'No upcoming payments'
+
+    if (subscriptions.length > 0) {
+      const now = new Date()
+      const upcomingPayments = subscriptions
+        .map(sub => getNextRenewal(sub.createdAt, sub.intervalSeconds))
+        .filter(date => date > now)
+        .sort((a, b) => a.getTime() - b.getTime())
+
+      if (upcomingPayments.length > 0) {
+        const nextDate = upcomingPayments[0]
+        const diffTime = nextDate.getTime() - now.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        nextPaymentDays = `${diffDays} day${diffDays !== 1 ? 's' : ''}`
+        nextPaymentDate = nextDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        })
+      }
+    }
+
+    return [
+      {
+        title: 'Total Active Subs',
+        value: isConnected ? totalSubs.toString() : '0',
+        icon: TrendingUp,
+        color: 'from-primary',
+        subtext: isConnected ? `${totalSubs === 0 ? 'No' : totalSubs} active subscription${totalSubs !== 1 ? 's' : ''}` : 'Connect wallet to view',
+        trend: isConnected && totalSubs > 0 ? 'Active' : '',
+      },
+      {
+        title: 'Monthly Spend (XLM)',
+        value: isConnected ? monthlySpend.toFixed(2) : '0.00',
+        icon: DollarSign,
+        color: 'from-accent',
+        subtext: isConnected ? 'Per billing cycle' : 'Connect wallet to view',
+        trend: isConnected && monthlySpend > 0 ? 'Recurring' : '',
+      },
+      {
+        title: 'Next Payment Due',
+        value: isConnected ? nextPaymentDays : '--',
+        icon: Clock,
+        color: 'from-secondary',
+        subtext: isConnected ? nextPaymentDate : 'Connect wallet to view',
+        trend: isConnected && subscriptions.length > 0 ? 'On Track' : '',
+      },
+    ]
+  }, [subscriptions, isConnected])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -62,7 +135,7 @@ export default function StatCards() {
                   <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">{stat.title}</p>
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <p className="text-3xl md:text-4xl font-bold text-balance">{stat.value}</p>
-                    {stat.title !== 'Next Payment Due' && (
+                    {stat.trend && (
                       <span className="text-xs text-accent font-semibold flex items-center gap-0.5 whitespace-nowrap">
                         <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
                         {stat.trend}

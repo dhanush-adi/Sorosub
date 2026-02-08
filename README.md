@@ -160,6 +160,23 @@ token_client.transfer_from(&contract_address, &subscriber, &merchant, &amount);
 | 📈 **Dashboard Analytics** | Track subscriptions, spending, and credit score |
 | 🌐 **Payment Streaming Ready** | Architecture supports per-second micropayments |
 
+### 📊 Cred-Fi Score Calculation
+
+The Cred-Fi score is calculated in **real-time** using data from the **Stellar Horizon API**:
+
+| Component | Points | How It's Calculated |
+|-----------|--------|---------------------|
+| **Base Score** | 10 | Awarded for having a connected wallet |
+| **Account Activity** | 0-15 | Based on account sequence number (higher = more active) |
+| **Payment Count** | 0-20 | 1 point per real payment (capped at 20) |
+| **Transaction Count** | 0-15 | Based on total transactions (5→5pts, 20→10pts, 50→15pts) |
+| **XLM Balance** | 0-10 | Balance tiers: 1→2pts, 10→4pts, 100→7pts, 1000→10pts |
+| **SoroSub Payments** | +10 each | Each successful subscription payment adds 10 points |
+
+**Formula:** `Cred-Fi Score = Base(10) + Activity(0-15) + Payments(0-20) + Transactions(0-15) + Balance(0-10) + SoroSub(+10/payment)`
+
+> **New wallets start at 10 points.** Score increases automatically as you make transactions, hold XLM, and pay subscriptions!
+
 ---
 
 ## 🏗️ Architecture Overview

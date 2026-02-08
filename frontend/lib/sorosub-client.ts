@@ -496,7 +496,7 @@ export async function getTokenBalance(userAddress: string): Promise<number> {
     try {
         const server = getSorobanServer();
         const contract = new Contract(CONTRACTS.USDC);
-        
+
         const user = new Address(userAddress);
         const account = await server.getAccount(userAddress);
 
@@ -514,7 +514,8 @@ export async function getTokenBalance(userAddress: string): Promise<number> {
 
         if ('result' in response && response.result) {
             const balance = response.result.retval.i128();
-            return fromStroops(balance.toString());
+            // Pass the i128 object directly - fromStroops handles i128 objects
+            return fromStroops(balance);
         }
 
         return 0;

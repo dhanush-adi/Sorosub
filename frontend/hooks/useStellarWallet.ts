@@ -44,6 +44,40 @@ export function useStellarWallet() {
     };
   }, []);
 
+  // Auto-check connection on mount (restore session)
+  useEffect(() => {
+    const checkExistingConnection = async () => {
+      // Skip if already connected or loading
+      if (globalState.isConnected || globalState.isLoading) return;
+
+      // Skip on server
+      if (typeof window === "undefined") return;
+
+      try {
+        // Check if Freighter is connected
+        const connResult = await freighterIsConnected();
+        if (!connResult) return;
+
+        // Try to get address without popup (if already authorized)
+        const addressResult = await getAddress();
+        if (addressResult?.address) {
+          // Wallet is already authorized, restore connection
+          setGlobalState({
+            isConnected: true,
+            isLoading: false,
+            publicKey: addressResult.address,
+            error: null,
+          });
+          console.log('[Wallet] Auto-restored connection:', addressResult.address.slice(0, 8) + '...');
+        }
+      } catch {
+        // Silent fail - user will need to manually connect
+      }
+    };
+
+    checkExistingConnection();
+  }, []);
+
   // Check if Freighter is installed
   const isFreighterInstalled = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined") return false;

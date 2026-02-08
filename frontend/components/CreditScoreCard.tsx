@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Star, TrendingUp, Loader2, Zap } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
-import { getCreditScore } from '@/lib/sorosub-client'
+import { getHorizonCreditData, HorizonCreditData } from '@/lib/horizon-credit'
 
 interface CreditScoreCardProps {
     merchantAddress?: string
@@ -12,6 +12,7 @@ interface CreditScoreCardProps {
 export default function CreditScoreCard({ merchantAddress }: CreditScoreCardProps) {
     const { isConnected, publicKey } = useStellarWallet()
     const [creditScore, setCreditScore] = useState<number>(0)
+    const [horizonData, setHorizonData] = useState<HorizonCreditData | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
@@ -33,40 +34,46 @@ export default function CreditScoreCard({ merchantAddress }: CreditScoreCardProp
         const fetchCreditScore = async () => {
             if (!isConnected || !publicKey) {
                 setCreditScore(0)
+                setHorizonData(null)
                 return
             }
 
             setIsLoading(true)
             try {
-                // HYBRID SCORING: Base from wallet + Contract score from payments
-                // This gives each wallet a unique starting point that grows with payments
+                // REAL-TIME CRED-FI SCORING using Horizon API
+                // Fetches actual on-chain data: sequence, payments, transactions, balance
 
-                // 1. Calculate wallet-specific base score (10-30 range)
-                const walletHash = publicKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-                const baseScore = (walletHash % 21) + 10 // 10-30 base
+                const horizonCredit = await getHorizonCreditData(publicKey)
 
-                // 2. Try to get contract score (from actual payments)
-                let contractScore = 0
-                if (merchantAddress) {
-                    const score = await getCreditScore(publicKey, merchantAddress)
-                    contractScore = score ?? 0
+                if (horizonCredit) {
+                    setHorizonData(horizonCredit)
+
+                    // Base score (10 points for having a valid account)
+                    const baseScore = 10
+
+                    // Total = Base + Horizon data
+                    const totalScore = baseScore + horizonCredit.totalHorizonScore
+                    setCreditScore(totalScore)
+
+                    console.log(`[CreditScore] Final: ${baseScore} (base) + ${horizonCredit.totalHorizonScore} (horizon) = ${totalScore}`)
+                } else {
+                    // Fallback if Horizon fails
+                    setCreditScore(10)
                 }
-
-                // 3. Combined score: base + contract earnings
-                const totalScore = baseScore + contractScore
-                setCreditScore(totalScore)
             } catch (error) {
                 console.error('Error fetching credit score:', error)
-                // Fallback to wallet-based score only
-                const walletHash = publicKey.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-                setCreditScore((walletHash % 21) + 10)
+                setCreditScore(10) // Minimum score
             } finally {
                 setIsLoading(false)
             }
         }
 
         fetchCreditScore()
-    }, [isConnected, publicKey, merchantAddress])
+
+        // Refresh every 30 seconds for real-time updates
+        const interval = setInterval(fetchCreditScore, 30000)
+        return () => clearInterval(interval)
+    }, [isConnected, publicKey])
 
     // Progress percentage for visual (cap at 100 for display)
     const progressPercent = Math.min((creditScore / 100) * 100, 100)

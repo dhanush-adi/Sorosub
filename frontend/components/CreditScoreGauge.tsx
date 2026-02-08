@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Star, TrendingUp, Loader2, Zap, Shield } from 'lucide-react'
 import { useStellarWallet } from '@/hooks/useStellarWallet'
-import { getCreditScore } from '@/lib/sorosub-client'
+import { getHorizonCreditData } from '@/lib/horizon-credit'
 
 interface CreditScoreGaugeProps {
     merchantAddress?: string
@@ -69,27 +69,43 @@ export default function CreditScoreGauge({ merchantAddress }: CreditScoreGaugePr
 
     useEffect(() => {
         const fetchCreditScore = async () => {
-            if (!isConnected || !publicKey) return
+            if (!isConnected || !publicKey) {
+                setCreditScore(0)
+                return
+            }
 
             setIsLoading(true)
             try {
-                if (merchantAddress) {
-                    const score = await getCreditScore(publicKey, merchantAddress)
-                    setCreditScore(score ?? 0)
+                // REAL-TIME CRED-FI SCORING using Horizon API
+                // Fetches actual on-chain data: sequence, payments, transactions, balance
+                const horizonCredit = await getHorizonCreditData(publicKey)
+
+                if (horizonCredit) {
+                    // Base score (10 points for having a valid account)
+                    const baseScore = 10
+                    const totalScore = baseScore + horizonCredit.totalHorizonScore
+                    setCreditScore(totalScore)
+
+                    console.log(`[CreditScoreGauge] Real score: ${totalScore} (base:10 + horizon:${horizonCredit.totalHorizonScore})`)
+                    console.log(`[CreditScoreGauge] Raw data:`, horizonCredit.rawData)
                 } else {
-                    // Demo value
-                    setCreditScore(65)
+                    // Fallback: minimal score for connected wallet
+                    setCreditScore(10)
                 }
-            } catch {
-                // Silently handle errors - use demo value
-                setCreditScore(65)
+            } catch (error) {
+                console.error('[CreditScoreGauge] Error:', error)
+                setCreditScore(10)
             } finally {
                 setIsLoading(false)
             }
         }
 
         fetchCreditScore()
-    }, [isConnected, publicKey, merchantAddress])
+
+        // Refresh every 30 seconds for real-time updates
+        const interval = setInterval(fetchCreditScore, 30000)
+        return () => clearInterval(interval)
+    }, [isConnected, publicKey])
 
     // Animate score on change
     useEffect(() => {
@@ -100,13 +116,13 @@ export default function CreditScoreGauge({ merchantAddress }: CreditScoreGaugePr
         const animate = () => {
             const elapsed = Date.now() - startTime
             const progress = Math.min(elapsed / duration, 1)
-            
+
             // Easing function for smooth animation
             const easeOutCubic = 1 - Math.pow(1 - progress, 3)
             const current = Math.round(startValue + (creditScore - startValue) * easeOutCubic)
-            
+
             setAnimatedScore(current)
-            
+
             if (progress < 1) {
                 requestAnimationFrame(animate)
             }
@@ -151,8 +167,8 @@ export default function CreditScoreGauge({ merchantAddress }: CreditScoreGaugePr
                     ) : (
                         <div className="relative w-44 h-44 flex items-center justify-center">
                             {/* SVG Gauge */}
-                            <svg 
-                                className="absolute inset-0 w-full h-full transform -rotate-[135deg]" 
+                            <svg
+                                className="absolute inset-0 w-full h-full transform -rotate-[135deg]"
                                 viewBox="0 0 160 160"
                             >
                                 {/* Background Arc */}
@@ -167,7 +183,7 @@ export default function CreditScoreGauge({ merchantAddress }: CreditScoreGaugePr
                                     strokeDasharray={`${halfCircumference} ${circumference}`}
                                     className="text-muted/20"
                                 />
-                                
+
                                 {/* Gradient Definition */}
                                 <defs>
                                     <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -175,7 +191,7 @@ export default function CreditScoreGauge({ merchantAddress }: CreditScoreGaugePr
                                         <stop offset="100%" stopColor={colorConfig.secondary} />
                                     </linearGradient>
                                 </defs>
-                                
+
                                 {/* Progress Arc */}
                                 <circle
                                     cx="80"

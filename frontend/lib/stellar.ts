@@ -38,9 +38,77 @@ export function toStroops(amount: number): bigint {
 }
 
 // Convert stroops to amount
-export function fromStroops(stroops: bigint | string): number {
-    const value = typeof stroops === 'string' ? BigInt(stroops) : stroops;
-    return Number(value) / 10_000_000;
+export function fromStroops(stroops: bigint | string | { lo: bigint; hi: bigint } | unknown): number {
+    try {
+        let value: bigint;
+
+        if (typeof stroops === 'bigint') {
+            value = stroops;
+        } else if (typeof stroops === 'string') {
+            // Guard against "[object Object]" strings
+            if (stroops === '[object Object]') {
+                console.warn('fromStroops received "[object Object]" string');
+                return 0;
+            }
+            value = BigInt(stroops);
+        } else if (typeof stroops === 'number') {
+            value = BigInt(Math.floor(stroops));
+        } else if (stroops && typeof stroops === 'object') {
+            // Handle i128 object from Soroban
+            const obj = stroops as Record<string, unknown>;
+
+            // Try to get value from common patterns
+            // Pattern 1: _value property (bigint)
+            if ('_value' in obj && typeof obj._value === 'bigint') {
+                value = obj._value;
+            }
+            // Pattern 2: lo/hi as methods (Stellar SDK i128)
+            else if ('lo' in obj && 'hi' in obj) {
+                const loVal = typeof obj.lo === 'function' ? (obj.lo as () => bigint)() : obj.lo;
+                const hiVal = typeof obj.hi === 'function' ? (obj.hi as () => bigint)() : obj.hi;
+
+                // Convert to bigint if not already
+                const lo = typeof loVal === 'bigint' ? loVal : BigInt(String(loVal));
+                const hi = typeof hiVal === 'bigint' ? hiVal : BigInt(String(hiVal));
+
+                value = (hi << BigInt(64)) + lo;
+            }
+            // Pattern 3: toString method that returns numeric string
+            else if ('toString' in obj && typeof obj.toString === 'function') {
+                const str = obj.toString();
+                if (str && str !== '[object Object]' && /^-?\d+$/.test(str)) {
+                    value = BigInt(str);
+                } else {
+                    console.warn('fromStroops: toString() did not return numeric string:', str);
+                    return 0;
+                }
+            }
+            // Pattern 4: value() method
+            else if ('value' in obj && typeof obj.value === 'function') {
+                const val = (obj.value as () => unknown)();
+                if (typeof val === 'bigint') {
+                    value = val;
+                } else if (typeof val === 'string' || typeof val === 'number') {
+                    value = BigInt(val);
+                } else {
+                    console.warn('Unknown value() result in fromStroops:', val);
+                    return 0;
+                }
+            }
+            else {
+                console.warn('Unknown object format in fromStroops:', Object.keys(obj), stroops);
+                return 0;
+            }
+        } else {
+            console.warn('Invalid type for fromStroops:', typeof stroops, stroops);
+            return 0;
+        }
+
+        return Number(value) / 10_000_000;
+    } catch (error) {
+        console.error('Error in fromStroops:', error, 'Input:', stroops);
+        return 0;
+    }
 }
 
 // Interval presets in seconds
