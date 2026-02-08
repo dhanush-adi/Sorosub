@@ -8,6 +8,26 @@
 
 ---
 
+## 📑 Table of Contents
+
+| Section | Description |
+|---------|-------------|
+| [🔗 Deployed Contract](#-deployed-contract-testnet) | Live contract on Stellar Testnet |
+| [❓ Problem Statement](#-problem-statement) | The problems we solve |
+| [✨ Features](#-features) | Key features & Cred-Fi scoring |
+| [🏗️ Architecture](#️-architecture-overview) | System architecture & flow diagram |
+| [📁 Project Structure](#-project-structure) | Codebase organization |
+| [🔧 Smart Contract API](#-smart-contract-api) | Contract function reference |
+| [🚀 Quick Start](#-quick-start) | Setup & installation guide |
+| [📸 Screenshots](#-screenshots) | UI screenshots |
+| [🔐 Security Model](#-security-model) | Token allowance & security |
+| [🗺️ Future Scope](#️-future-scope) | Roadmap & planned features |
+| [🧪 Testing](#-testing) | Test instructions |
+| [📚 References](#-references) | Documentation links |
+| [👥 Team](#-team) | Team members |
+
+---
+
 ## 🔗 Deployed Contract (Testnet)
 
 | Property | Value |
@@ -180,6 +200,9 @@ The Cred-Fi score is calculated in **real-time** using data from the **Stellar H
 ---
 
 ## 🏗️ Architecture Overview
+
+![Architecture Diagram](screenshots/Architecture%20diagram.jpeg)
+*SoroSub Architecture & Subscription Payment Flow*
 
 ```mermaid
 flowchart TB
